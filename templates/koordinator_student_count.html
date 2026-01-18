@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-title">Input Jumlah Mahasiswa Aktif</h2>
+        <div style="color:var(--muted); font-size:13px">Distribusi otomatis ke mata kuliah berdasarkan proporsi SKS</div>
+    </div>
+    <div class="page-actions">
+        <form method="GET" style="display:flex; gap:8px; align-items:center;">
+            <label style="font-size:13px; font-weight:500;">Filter Semester:</label>
+            <select name="semester_type" onchange="this.form.submit()" style="padding:8px 12px; border:1px solid var(--border); border-radius:6px; font-size:13px;">
+                <option value="semua" {% if semester_type == 'semua' %}selected{% endif %}>Semua</option>
+                <option value="ganjil" {% if semester_type == 'ganjil' %}selected{% endif %}>Ganjil (I,III,V,VII)</option>
+                <option value="genap" {% if semester_type == 'genap' %}selected{% endif %}>Genap (II,IV,VI,VIII)</option>
+            </select>
+        </form>
+        <a class="btn btn-ghost" href="/koordinator">Kembali</a>
+    </div>
+</div>
+
+<!-- Info Box -->
+<div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-bottom: 20px;">
+    <h3 style="color: white; margin-bottom: 12px;">📊 Cara Mengisi Jumlah Mahasiswa</h3>
+    <div style="font-size: 14px; line-height: 1.8;">
+        <strong>Opsi 1: Input Total (Auto-Distribusi)</strong><br>
+        • Masukkan total mahasiswa aktif → sistem distribusi otomatis berdasarkan proporsi mata kuliah per semester<br><br>
+        
+        <strong>Opsi 2: Input Per Semester (Manual)</strong><br>
+        • Isi langsung per semester sesuai data real mahasiswa<br>
+        • <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px;">⚠️ PENTING: Isi semester yang sesuai dengan semester mata kuliah</span><br>
+        • Contoh: Jika mata kuliah ada di Semester II, IV, VI → isi angka di Semester 2, 4, 6<br><br>
+        
+        <strong>Kapasitas Section:</strong> Teori=45 mhs/kelas | Lab=36 mhs/kelas
+    </div>
+</div>
+
+<!-- Form Input -->
+
+
+<!-- Manual per-semester override -->
+<div class="card" style="margin-top: 20px;">
+    <h3>Isi Per Semester (Manual)</h3>
+    <form method="POST" style="margin-top: 16px;">
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:12px;">
+            {% for sem in ["1","2","3","4","5","6","7","8"] %}
+            <div>
+                <label style="display:block; font-weight:600; margin-bottom:6px;">
+                    Semester {{ sem }}
+                    {% if sem in ["1","2","3","4","5","6","7"] %}
+                       
+                    {% endif %}
+                </label>
+                <input type="number" name="{{ sem }}" value="{{ student_counts[sem]|default(0) }}" min="0" 
+                       style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;">
+            </div>
+            {% endfor %}
+        </div>
+        <div style="margin-top: 16px;">
+            <button type="submit" class="btn btn-secondary">💾 Simpan Per Semester</button>
+            <small style="color: var(--muted); display:block; margin-top:6px;">
+                Tips: Isi <strong>Semester 2, 4, 6</strong> sesuai jumlah mahasiswa aktif yang mengambil mata kuliah di semester tersebut
+            </small>
+        </div>
+    </form>
+</div>
+
+<!-- Summary Saat Ini -->
+{% if total_students_current > 0 %}
+<div class="card" style="margin-top: 20px;">
+    <h3>Ringkasan Distribusi Saat Ini</h3>
+    
+    <div style="padding: 16px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); border-radius: 8px; margin-bottom: 20px;">
+        <div style="display: flex; gap: 32px; flex-wrap: wrap;">
+            <div>
+                <div style="color: var(--muted); font-size: 13px; margin-bottom: 4px;">Total Mahasiswa</div>
+                <div style="font-size: 32px; font-weight: bold; color: var(--primary);">{{ total_students_current }}</div>
+            </div>
+            <div>
+                <div style="color: var(--muted); font-size: 13px; margin-bottom: 4px;">Total Kelas</div>
+                <div style="font-size: 32px; font-weight: bold; color: var(--success);">{{ total_sections_current }}</div>
+            </div>
+            <div>
+                <div style="color: var(--muted); font-size: 13px; margin-bottom: 4px;">Total Mata Kuliah</div>
+                <div style="font-size: 32px; font-weight: bold; color: #6366f1;">{{ courses|length }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Semester Summary -->
+    {% if semester_summary %}
+    <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);">
+        <h4 style="margin-bottom: 16px;">Distribusi per Semester</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+            {% for semester, data in semester_summary.items() %}
+            <div style="padding: 16px; background: var(--surface-low); border-radius: 8px; border-left: 4px solid {% if semester == 1 %}#667eea{% elif semester == 3 %}#06b6d4{% elif semester == 5 %}#f59e0b{% else %}#ec4899{% endif %};">
+                <div style="font-size: 12px; color: var(--muted); margin-bottom: 8px;">SEMESTER {{ semester }} ({% if semester % 2 == 1 %}GANJIL{% else %}GENAP{% endif %})</div>
+                <div style="display: flex; justify-content: space-between; gap: 16px; margin-bottom: 12px;">
+                    <div>
+                        <div style="font-size: 11px; color: var(--muted); margin-bottom: 4px;">Mahasiswa</div>
+                        <div style="font-size: 24px; font-weight: bold;">{{ data.students }}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 11px; color: var(--muted); margin-bottom: 4px;">Kelas</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--success);">{{ data.sections }}</div>
+                    </div>
+                </div>
+                <div style="font-size: 12px; color: var(--muted); text-align: center; padding-top: 8px; border-top: 1px solid var(--border);">
+                    {{ data.courses }} course
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tabel Distribusi -->
+    <div style="margin-top: 24px;">
+        <h4 style="margin-bottom: 16px;">Detail Distribusi per Mata Kuliah</h4>
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; font-size: 13px;">
+                <thead>
+                    <tr style="background: var(--surface-low); border-bottom: 2px solid var(--border);">
+                        <th style="padding: 12px; text-align: left;">Mata Kuliah</th>
+                        <th style="padding: 12px; text-align: center;">SKS</th>
+                        <th style="padding: 12px; text-align: center;">Tipe</th>
+                        <th style="padding: 12px; text-align: center;">Mahasiswa</th>
+                        <th style="padding: 12px; text-align: center;">Kelas</th>
+                        <th style="padding: 12px; text-align: center;">Semester</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for course in courses %}
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 12px;">
+                            <strong>{{ course.name }}</strong>
+                        </td>
+                        <td style="padding: 12px; text-align: center;">{{ course.sks }}</td>
+                        <td style="padding: 12px; text-align: center;">
+                            {% if course.is_lab %}
+                                <span style="background: #fca5a5; color: #7f1d1d; padding: 4px 8px; border-radius: 4px; font-size: 12px;">LAB</span>
+                            {% else %}
+                                <span style="background: #bfdbfe; color: #1e3a8a; padding: 4px 8px; border-radius: 4px; font-size: 12px;">TEORI</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 12px; text-align: center;">
+                            {{ course.student_count | default(0) }}
+                        </td>
+                        <td style="padding: 12px; text-align: center;">
+                            <strong style="color: var(--success);">{{ course.required_sections | default(0) }}</strong>
+                        </td>
+                        <td style="padding: 12px; text-align: center;">{{ course.semester | default('—') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div style="margin-top: 16px; padding: 12px; background: var(--surface-low); border-radius: 6px; font-size: 13px;">
+        <p style="margin: 0; color: var(--muted);">
+            💡 <strong>Catatan:</strong> Setelah mengisi dan mendistribusi mahasiswa, gunakan tombol "Generate Sections" 
+            di halaman utama untuk membuat jadwal otomatis.
+        </p>
+    </div>
+</div>
+{% else %}
+<div class="card" style="margin-top: 20px; text-align: center; padding: 40px; color: var(--muted);">
+    <div style="font-size: 48px; margin-bottom: 16px;">📭</div>
+    <p>Belum ada distribusi mahasiswa. Silakan isi form di atas untuk memulai.</p>
+</div>
+{% endif %}
+
+{% endblock %}

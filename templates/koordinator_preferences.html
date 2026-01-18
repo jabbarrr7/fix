@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-title">📋 Preferensi Dosen</h2>
+        <div class="text-muted text-sm">Daftar dosen yang sudah mengisi preferensi jadwal</div>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-ghost" href="/koordinator">Kembali ke Dashboard</a>
+    </div>
+</div>
+
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:12px;">
+        <div>
+            <div class="text-muted text-sm">Total dosen: {{ total }}</div>
+            <div class="text-muted text-sm">Sudah isi preferensi: {{ with_pref }}</div>
+        </div>
+        <input type="text" id="searchPref" placeholder="🔍 Cari dosen..." style="width:260px; padding:10px 12px; border:1px solid #e6e9ef; border-radius:8px; font-size:14px;" onkeyup="filterPrefTable()">
+    </div>
+
+    <div class="table-responsive">
+        <table id="prefTable">
+            <thead>
+                <tr>
+                    <th>No</th>
+                    <th>Nama Dosen</th>
+                    <th>Hari Tersedia</th>
+                    <th>Waktu Preferensi</th>
+                    <th>Waktu Tidak Tersedia</th>
+                    <th>Max Load</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in lecturers %}
+                <tr class="{% if row.has_any %}row-has-pref{% else %}row-no-pref{% endif %}">
+                    <td>{{ loop.index }}</td>
+                    <td style="font-weight:600;">{{ row.name }}</td>
+                    <td>
+                        {% if row.available_days %}
+                            {% for d in row.available_days %}
+                                <span class="badge badge-acceptable" style="margin:2px;">{{ d }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.preferred_times %}
+                            {% for day, ranges in row.preferred_times.items() %}
+                                <div style="margin-bottom:4px;"><strong>{{ day }}:</strong> {{ ranges|join(', ') }}</div>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.unavailable_time_ranges %}
+                            {% for block in row.unavailable_time_ranges %}
+                                <div style="margin-bottom:4px;">{{ block.day or '*' }} {{ block.start }}–{{ block.end }}</div>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ row.max_load or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function filterPrefTable() {
+    const q = document.getElementById('searchPref').value.toLowerCase();
+    const rows = document.querySelectorAll('#prefTable tbody tr');
+    rows.forEach(r => {
+        const name = r.cells[1].innerText.toLowerCase();
+        r.style.display = name.includes(q) ? '' : 'none';
+    });
+}
+</script>
+
+{% endblock %}

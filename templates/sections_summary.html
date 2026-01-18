@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-title">📚 Ringkasan Section yang Dibuat</h2>
+        <div style="color:var(--muted); font-size:13px">Jumlah section per mata kuliah dengan kapasitas masing-masing</div>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-primary" href="/schedule_sections_ortools">🔄 Generate Jadwal</a>
+        <a class="btn btn-ghost" href="/koordinator">Kembali</a>
+    </div>
+</div>
+
+<!-- Summary Stats -->
+<div class="card">
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:16px; margin-bottom:20px;">
+        <div style="padding:16px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; border-radius:8px;">
+            <div style="font-size:12px; opacity:0.9; margin-bottom:6px;">Total Section</div>
+            <div style="font-size:28px; font-weight:bold;">{{ total_sections }}</div>
+        </div>
+        <div style="padding:16px; background:linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color:white; border-radius:8px;">
+            <div style="font-size:12px; opacity:0.9; margin-bottom:6px;">Total Kapasitas</div>
+            <div style="font-size:28px; font-weight:bold;">{{ total_capacity }}</div>
+        </div>
+        <div style="padding:16px; background:linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color:white; border-radius:8px;">
+            <div style="font-size:12px; opacity:0.9; margin-bottom:6px;">Mata Kuliah</div>
+            <div style="font-size:28px; font-weight:bold;">{{ summary|length }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Detail Table -->
+<div class="card">
+    <h3 style="margin-bottom:16px;">Detail Section per Mata Kuliah</h3>
+    <div style="overflow-x:auto;">
+        <table style="width:100%; font-size:13px; border-collapse:collapse;">
+            <thead>
+                <tr style="background:var(--surface-low); border-bottom:2px solid var(--border);">
+                    <th style="padding:12px; text-align:left;">Mata Kuliah</th>
+                    <th style="padding:12px; text-align:center;">SKS</th>
+                    <th style="padding:12px; text-align:center;">Tipe</th>
+                    <th style="padding:12px; text-align:center;">Section</th>
+                    <th style="padding:12px; text-align:center;">Kuota/Section</th>
+                    <th style="padding:12px; text-align:center;">Total Kuota</th>
+                    <th style="padding:12px; text-align:center;">Dosen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in summary %}
+                <tr style="border-bottom:1px solid var(--border);">
+                    <td style="padding:12px; font-weight:600;">{{ item.course_name }}</td>
+                    <td style="padding:12px; text-align:center;">{{ item.sks }}</td>
+                    <td style="padding:12px; text-align:center;">
+                        {% if item.is_lab %}
+                            <span style="background:#fca5a5; color:#7f1d1d; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:600;">LAB</span>
+                        {% else %}
+                            <span style="background:#bfdbfe; color:#1e3a8a; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:600;">TEORI</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:12px; text-align:center; font-weight:bold; font-size:14px;">{{ item.section_count }}</td>
+                    <td style="padding:12px; text-align:center;">{{ item.capacity_per_section }}</td>
+                    <td style="padding:12px; text-align:center; font-weight:bold; color:var(--success); font-size:14px;">{{ item.total_capacity }}</td>
+                    <td style="padding:12px; text-align:center;">
+                        <span style="background:#e0e7ff; color:#3730a3; padding:4px 8px; border-radius:4px; font-size:11px;">Unassigned</span>
+                    </td>
+                </tr>
+                {% for section in item.sections %}
+                <tr style="border-bottom:1px solid var(--border); background:var(--surface-low);">
+                    <td style="padding:10px 12px; font-size:12px; color:var(--muted);">
+                        → {{ section.section_label }}
+                    </td>
+                    <td colspan="6" style="padding:10px 12px; font-size:12px; color:var(--muted);">
+                        Capacity: {{ item.capacity_per_section }} mahasiswa | Status: <span style="color:#8b5cf6;">{{ section.lecturer }}</span>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Next Steps -->
+<div class="card" style="background:linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%); border-left:4px solid #22c55e;">
+    <h4 style="margin-top:0; color:#16a34a;">✅ Langkah Berikutnya</h4>
+    <ol style="margin:12px 0; padding-left:20px;">
+        <li style="margin:8px 0;">
+            <strong>Assign Dosen ke Section</strong> — Koordinator/Dosen memilih dosen untuk setiap section
+        </li>
+        <li style="margin:8px 0;">
+            <strong>Generate Jadwal</strong> — Klik tombol "Generate Jadwal" di atas untuk penjadwalan otomatis
+        </li>
+        <li style="margin:8px 0;">
+            <strong>Verifikasi Jadwal</strong> — Periksa jadwal untuk memastikan tidak ada bentrok
+        </li>
+    </ol>
+</div>
+
+{% endblock %}

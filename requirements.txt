@@ -1,0 +1,19 @@
+# Flask Web Framework
+Flask==3.0.0
+Werkzeug==3.0.1
+
+# MongoDB Driver
+pymongo==4.6.1
+
+# Data Processing
+pandas==2.1.4
+openpyxl==3.1.2
+
+# Genetic Algorithm (DEAP)
+deap==1.4.1
+
+# OR-Tools Optimization
+ortools==9.8.3296
+
+# Utilities
+python-dateutil==2.8.2

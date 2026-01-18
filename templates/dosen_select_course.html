@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-title">Pilih Mata Kuliah</h2>
+        <div style="color:var(--muted); font-size:13px">Pilih salah satu mata kuliah yang ingin Anda ambil</div>
+    </div>
+    <div class="page-actions" style="display:flex; gap:12px; align-items:center;">
+        <div style="font-size:13px; color:var(--muted);">
+            Kelas Anda: <strong>{{ current_sections_count }}</strong> / <strong>{{ max_sections_cap }}</strong>
+        </div>
+        <a class="btn btn-ghost" href="/dosen">Kembali</a>
+    </div>
+</div>
+
+    <div class="card">
+    <div class="table-responsive">
+        {% for sem, group in courses_by_semester.items() %}
+            <h4 style="margin:10px 0">Semester {{ sem }}</h4>
+            <table>
+                <thead>
+                    <tr><th>Nama Mata Kuliah</th><th>SKS</th><th>Semester</th><th>Timeslot</th><th>Status</th><th>Aksi</th></tr>
+                </thead>
+                <tbody>
+                {% for c in group %}
+                <tr>
+                    <td>
+                        {{ c.course_name }}
+                        <div style="font-size:12px;color:var(--muted);">
+                            {% set total = c.max_dosen_per_course or 0 %}
+                            {% set chosen = (c.selected_by | length) if c.selected_by else 0 %}
+                            {% set remaining = (total - chosen) if total is not none else 0 %}
+                            {% if total > 0 %}
+                                {% if chosen == 0 %}
+                                    ({{ total }} kelas tersedia)
+                                {% elif remaining > 0 %}
+                                    ({{ remaining }} kelas tersisa dari {{ total }})
+                                {% else %}
+                                    (Kelas penuh)
+                                {% endif %}
+                            {% else %}
+                                (0 kelas)
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>{{ c.sks }}</td>
+                    <td>{{ c.semester }}</td>
+                    <td>
+                        {% if c.has_slot %}
+                            {{ c.slot.day }} {{ c.slot.start|replace(':', '.') }}–{{ c.slot.end|replace(':', '.') }} ({{ c.slot.room }})
+                        {% else %}
+                            <span style="color:var(--muted);">Belum ada</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if c.selected_by %}
+                            Dipilih oleh {{ c.selected_by|join(', ') }}
+                            {% if c.reserved_at %}
+                                <div style="font-size:12px;color:var(--muted);">(dibooking: {{ c.reserved_at }})</div>
+                            {% endif %}
+                            {% if username in c.selected_by %}
+                                {% if c.has_slot %}
+                                    <div style="font-size:13px;color:green;">Sudah dijadwalkan: {{ c.slot.day }} {{ c.slot.start|replace(':', '.') }} – {{ c.slot.end|replace(':', '.') }} ({{ c.slot.room }})</div>
+                                {% else %}
+                                    <div style="font-size:13px;color:orange;">Belum ada jadwal</div>
+                                {% endif %}
+                            {% endif %}
+                        {% else %}
+                            <strong style="color:green;">Tersedia</strong>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if username not in c.selected_by %}
+                            {% if c.course_full %}
+                                <span class="text-danger" style="font-weight:600;">Kelas sudah penuh</span>
+                            {% else %}
+                                <a class="btn btn-primary" href="{{ url_for('choose_course', course_id=c._id) }}">Pilih</a>
+                            {% endif %}
+                        {% else %}
+                            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                                {# Tombol Pilih Jadwal dihapus sesuai permintaan #}
+                                <a class="btn btn-danger" href="{{ url_for('unselect_course', course_id=c._id) }}">Batalkan</a>
+                            </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock %}
