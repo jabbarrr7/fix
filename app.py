@@ -951,79 +951,79 @@ def _times_overlap(s1, e1, s2, e2):
 # MONGODB CONNECTION
 # ------------------------------
 
-# try:
-#     client = MongoClient(
-#         "mongodb+srv://salamull1005:Jabbar1005@schedules.fb8isvj.mongodb.net/?appName=schedules",
-#         tls=True,
-#         tlsAllowInvalidCertificates=True,
-#         serverSelectionTimeoutMS=10000,
-#         connectTimeoutMS=10000,
-#         socketTimeoutMS=10000
-#     )
-#     client.server_info()  # Test connection immediately
-#     db = client["schedule_db"]
-#     schedules_collection = db["schedules"]
-#     users_collection = db["users"]
-#     courses_collection = db["courses"]
-#     unavailability_reports_collection = db["unavailability_reports"]
-#     sections_collection = db["sections"]
-#     active_students_collection = db["active_students"]
-#     # New collection for GA-generated sections (before time/room scheduling)
-#     try:
-#         sections_collection = db["sections"]
-#     except Exception:
-#         sections_collection = None
-#     print("MongoDB Atlas connection: SUCCESS")
-# except Exception as e:
-#     print(f"MongoDB Atlas connection: FAILED\n{e}")
-#     # Provide safe dummy objects so the app routes won't crash when DB is down.
-#     db = DummyDB()
-#     schedules_collection = db.schedules
-#     users_collection = db.users
-#     courses_collection = db.courses
-#     unavailability_reports_collection = db.unavailability_reports
-#     sections_collection = getattr(db, "sections", None)
-#     active_students_collection = getattr(db, "active_students", None)
+try:
+    client = MongoClient(
+        "mongodb+srv://salamull1005:Jabbar1005@schedules.fb8isvj.mongodb.net/?appName=schedules",
+        tls=True,
+        tlsAllowInvalidCertificates=True,
+        serverSelectionTimeoutMS=10000,
+        connectTimeoutMS=10000,
+        socketTimeoutMS=10000
+    )
+    client.server_info()  # Test connection immediately
+    db = client["schedule_db"]
+    schedules_collection = db["schedules"]
+    users_collection = db["users"]
+    courses_collection = db["courses"]
+    unavailability_reports_collection = db["unavailability_reports"]
+    sections_collection = db["sections"]
+    active_students_collection = db["active_students"]
+    # New collection for GA-generated sections (before time/room scheduling)
+    try:
+        sections_collection = db["sections"]
+    except Exception:
+        sections_collection = None
+    print("MongoDB Atlas connection: SUCCESS")
+except Exception as e:
+    print(f"MongoDB Atlas connection: FAILED\n{e}")
+    # Provide safe dummy objects so the app routes won't crash when DB is down.
+    db = DummyDB()
+    schedules_collection = db.schedules
+    users_collection = db.users
+    courses_collection = db.courses
+    unavailability_reports_collection = db.unavailability_reports
+    sections_collection = getattr(db, "sections", None)
+    active_students_collection = getattr(db, "active_students", None)
 
 
 # ==============================================================================
 # MONGODB DATABASE CONNECTION
 # ==============================================================================
 
-try:
-    # KONEKSI KE MONGODB LOCAL
-    # MongoDB digunakan untuk menyimpan semua data sistem:
-    # - users: Dosen dan koordinator
-    # - courses: Mata kuliah
-    # - sections: Section hasil GA optimization
-    # - schedules: Jadwal final hasil OR-Tools scheduling
-    # - unavailability_reports: Request reschedule dari dosen
-    # - active_students: Jumlah mahasiswa aktif per semester
+# try:
+#     # KONEKSI KE MONGODB LOCAL
+#     # MongoDB digunakan untuk menyimpan semua data sistem:
+#     # - users: Dosen dan koordinator
+#     # - courses: Mata kuliah
+#     # - sections: Section hasil GA optimization
+#     # - schedules: Jadwal final hasil OR-Tools scheduling
+#     # - unavailability_reports: Request reschedule dari dosen
+#     # - active_students: Jumlah mahasiswa aktif per semester
     
-    client = MongoClient(
-        "mongodb://localhost:27017",
-        serverSelectionTimeoutMS=5000  # Timeout 5 detik untuk koneksi
-    )
+#     client = MongoClient(
+#         "mongodb://localhost:27017",
+#         serverSelectionTimeoutMS=5000  # Timeout 5 detik untuk koneksi
+#     )
 
-    # Test koneksi dengan ping command
-    client.admin.command("ping")
+#     # Test koneksi dengan ping command
+#     client.admin.command("ping")
 
-    # Pilih database
-    db = client["schedule_db"]
+#     # Pilih database
+#     db = client["schedule_db"]
 
-    # Inisialisasi semua collections
-    schedules_collection = db["schedules"]           # Collection untuk jadwal final
-    users_collection = db["users"]                   # Collection untuk dosen dan koordinator
-    courses_collection = db["courses"]               # Collection untuk mata kuliah
-    unavailability_reports_collection = db["unavailability_reports"]  # Request reschedule
-    sections_collection = db["sections"]             # Sections hasil GA
-    active_students_collection = db["active_students"]  # Jumlah mahasiswa per semester
-    removed_sections_collection = db["removed_sections"]  # Log section yang dihapus
+#     # Inisialisasi semua collections
+#     schedules_collection = db["schedules"]           # Collection untuk jadwal final
+#     users_collection = db["users"]                   # Collection untuk dosen dan koordinator
+#     courses_collection = db["courses"]               # Collection untuk mata kuliah
+#     unavailability_reports_collection = db["unavailability_reports"]  # Request reschedule
+#     sections_collection = db["sections"]             # Sections hasil GA
+#     active_students_collection = db["active_students"]  # Jumlah mahasiswa per semester
+#     removed_sections_collection = db["removed_sections"]  # Log section yang dihapus
 
-    print("MongoDB LOCAL connection: SUCCESS")
+#     print("MongoDB LOCAL connection: SUCCESS")
 
-except Exception as e:
-    print(f"MongoDB LOCAL connection: FAILED\n{e}")
+# except Exception as e:
+#     print(f"MongoDB LOCAL connection: FAILED\n{e}")
 
     # Dummy fallback: jika MongoDB gagal connect, gunakan DummyDB
     # Ini mencegah aplikasi crash saat database tidak tersedia
@@ -11841,4 +11841,5 @@ def schedule_analytics():
 
 
 if __name__ == "__main__":
+
     app.run(debug=True)
