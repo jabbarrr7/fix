@@ -1,234 +1,56 @@
-"""
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║   SISTEM PENJADWALAN PERKULIAHAN MENGGUNAKAN OR-TOOLS & GENETIC ALGORITHM   ║
-║                                                                              ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ JUDUL SKRIPSI:                                                               │
-│ Sistem Penjadwalan Perkuliahan Menggunakan OR-Tools                         │
-│                                                                              │
-│ TEKNOLOGI UTAMA:                                                             │
-│ 1. Google OR-Tools CP-SAT Solver - Constraint Programming                   │
-│ 2. DEAP Library - Genetic Algorithm                                         │
-│ 3. Flask - Web Framework                                                    │
-│ 4. MongoDB - Database                                                       │
-└──────────────────────────────────────────────────────────────────────────────┘
-
-═══════════════════════════════════════════════════════════════════════════════
-📋 DESKRIPSI SISTEM
-═══════════════════════════════════════════════════════════════════════════════
-
-Sistem ini mengimplementasikan HYBRID APPROACH untuk penjadwalan perkuliahan:
-
-    ┌─────────────────────────────────────────────────────────────────┐
-    │  GENETIC ALGORITHM (DEAP)                                        │
-    │  → Optimasi penugasan dosen ke mata kuliah                       │
-    │  → Mempertimbangkan preferensi dan beban kerja                   │
-    │  → Output: Daftar assignment dosen-mata kuliah yang optimal      │
-    └─────────────────────────────────────────────────────────────────┘
-                                    ↓
-    ┌─────────────────────────────────────────────────────────────────┐
-    │  SECTION GENERATION                                              │
-    │  → Hitung jumlah section berdasarkan mahasiswa aktif             │
-    │  → Capacity: 45 (teori), 36 (praktikum)                         │
-    │  → Output: Sections yang perlu dijadwalkan                       │
-    └─────────────────────────────────────────────────────────────────┘
-                                    ↓
-    ┌─────────────────────────────────────────────────────────────────┐
-    │  OR-TOOLS CP-SAT SOLVER                                          │
-    │  → Constraint satisfaction untuk waktu & ruangan                 │
-    │  → Hard constraints: No conflicts, valid assignments             │
-    │  → Soft constraints: Preferences, load balancing                 │
-    │  → Output: Jadwal lengkap (hari, waktu, ruangan)                │
-    └─────────────────────────────────────────────────────────────────┘
-                                    ↓
-    ┌─────────────────────────────────────────────────────────────────┐
-    │  CAP/FAIR DISTRIBUTION                                           │
-    │  → Distribusi beban kerja merata antar dosen                     │
-    │  → Output: Jadwal final dengan keadilan beban kerja              │
-    └─────────────────────────────────────────────────────────────────┘
-
-═══════════════════════════════════════════════════════════════════════════════
-🎯 FITUR UTAMA
-═══════════════════════════════════════════════════════════════════════════════
-
-✓ Penjadwalan Otomatis
-  └─ Menggunakan OR-Tools CP-SAT untuk constraint satisfaction
-  └─ Genetic Algorithm untuk optimasi assignment
-
-✓ Manajemen Preferensi
-  └─ Dosen dapat set preferensi hari dan waktu mengajar
-  └─ Sistem mempertimbangkan preferensi dalam scheduling
-
-✓ Conflict Detection & Resolution
-  └─ Deteksi otomatis bentrok dosen, ruangan, dan waktu
-  └─ Auto-reschedule jika ditemukan konflik
-
-✓ Request Reschedule
-  └─ Dosen dapat request perubahan jadwal
-  └─ Koordinator dapat approve/reject request
-
-✓ Load Balancing (CAP/FAIR)
-  └─ Distribusi beban kerja merata antar dosen
-  └─ Flexible section distribution
-
-✓ Dashboard & Analytics
-  └─ Dashboard koordinator: overview sistem, analytics
-  └─ Dashboard dosen: jadwal pribadi, request management
-
-✓ Export & Reports
-  └─ Export jadwal ke Excel
-  └─ Generate schedule analytics
-  └─ Conflict reports
-
-═══════════════════════════════════════════════════════════════════════════════
-📁 STRUKTUR DATABASE (MongoDB Collections)
-═══════════════════════════════════════════════════════════════════════════════
-
-1. users
-   └─ Menyimpan data koordinator dan dosen
-   └─ Fields: name, email, password, role, preferences
-
-2. courses
-   └─ Menyimpan data mata kuliah
-   └─ Fields: course_name, sks, semester, is_lab, is_online, selected_by[]
-
-3. sections
-   └─ Hasil GA: Section yang perlu dijadwalkan
-   └─ Fields: course_id, section_number, lecturer, sks, is_lab
-
-4. schedules
-   └─ Hasil OR-Tools: Jadwal final lengkap
-   └─ Fields: dosen, mata_kuliah, section, hari, waktu, ruangan, sks
-
-5. active_students
-   └─ Jumlah mahasiswa aktif per semester
-   └─ Fields: semester, count
-
-6. unavailability_reports
-   └─ Request reschedule dari dosen
-   └─ Fields: lecturer_name, report_type, unavailable_day, status
-
-═══════════════════════════════════════════════════════════════════════════════
-🔧 FUNGSI-FUNGSI KUNCI
-═══════════════════════════════════════════════════════════════════════════════
-
-1. ortools_optimize_schedule() - Line ~1230
-   └─ FUNGSI UTAMA OR-TOOLS: Scheduling dengan CP-SAT Solver
-   └─ Input: Sections + Constraints
-   └─ Output: Complete schedule
-
-2. schedule_sections_with_ortools() - Line ~6600
-   └─ Wrapper untuk OR-Tools scheduling dengan filter semester
-   └─ Dipanggil dari route /schedule_sections_ortools
-
-3. evaluate_schedule() - Line ~1050
-   └─ FITNESS FUNCTION untuk Genetic Algorithm
-   └─ Evaluasi kualitas assignment dosen-mata kuliah
-   └─ Return: Conflict score (lower is better)
-
-4. generate_sections_ga_pipeline() - Line ~6200
-   └─ Pipeline lengkap: GA → Sections generation → Save to DB
-   └─ Dipanggil dari route /generate_sections_ga
-
-5. normalize_all_lecturer_names() - Line ~35
-   └─ Normalisasi nama dosen dengan fuzzy matching
-   └─ Memastikan konsistensi nama di seluruh sistem
-
-═══════════════════════════════════════════════════════════════════════════════
-🌐 FLASK ROUTES (Endpoints)
-═══════════════════════════════════════════════════════════════════════════════
-
-KOORDINATOR ROUTES:
-├─ /koordinator_home              → Dashboard koordinator
-├─ /koordinator_courses           → Manage mata kuliah
-├─ /koordinator_dosen             → Manage dosen
-├─ /koordinator_schedule          → View jadwal
-├─ /koordinator/student_count     → Input jumlah mahasiswa
-├─ /generate_sections_ga          → Generate sections (GA)
-└─ /schedule_sections_ortools     → Schedule sections (OR-Tools) ⭐
-
-DOSEN ROUTES:
-├─ /dosen                         → Dashboard dosen
-├─ /dosen/preferences             → Set preferensi
-├─ /dosen/report_unavailability   → Report ketidaktersediaan
-└─ /dosen/request_reschedule      → Request reschedule
-
-API ROUTES:
-├─ /api/active_students           → Manage mahasiswa aktif
-├─ /api/get_course_sections       → Get sections per course
-└─ /export_schedule_with_probability → Export ke Excel
-
-═══════════════════════════════════════════════════════════════════════════════
-⚙️ CONSTRAINT PARAMETERS
-═══════════════════════════════════════════════════════════════════════════════
-
-TIME CONSTRAINTS:
-├─ Senin-Kamis: 08:00-12:10, 14:00-16:30
-├─ Jumat: 08:00-12:10, 14:00-16:30 (avoid 12:10-14:00 untuk sholat Jumat)
-└─ SKS to Minutes: 1-2 SKS = 100 min, 3 SKS = 150 min
-
-ROOM CONSTRAINTS:
-├─ Non-Lab Rooms: Infor 1-5, Jawa 8A/8B (capacity: 45)
-└─ Lab Rooms: Lab 1-4 (capacity: 36)
-
-LECTURER CONSTRAINTS:
-├─ Max consecutive days: 3 hari
-├─ Max courses per lecturer: 2 mata kuliah
-├─ Sections per course: 2 sections
-└─ Workload balancing: CAP/FAIR distribution
-
-PENALTY CONSTANTS (GA):
-├─ Same course different day: 10^30
-├─ Conflict penalty: 10^25
-└─ Preference violations: 2-10 points
-
-═══════════════════════════════════════════════════════════════════════════════
-📚 UNTUK SIDANG SKRIPSI
-═══════════════════════════════════════════════════════════════════════════════
-
-POIN PENTING YANG HARUS DIJELASKAN:
-
-1. MENGAPA OR-TOOLS?
-   → Constraint Programming sangat cocok untuk scheduling problems
-   → CP-SAT Solver dapat handle hard & soft constraints secara optimal
-   → Terbukti efisien untuk problem dengan puluhan ribu variables
-
-2. MENGAPA HYBRID (GA + OR-TOOLS)?
-   → GA fleksibel untuk optimasi assignment dengan preferensi kompleks
-   → OR-Tools excellent untuk constraint satisfaction di scheduling
-   → Kombinasi keduanya memberikan hasil terbaik
-
-3. KOMPLEKSITAS:
-   → Variables: O(L × C × S × D × R × T) ≈ 50,000-200,000 Boolean vars
-   → Solve time: 5-60 detik (tergantung kompleksitas problem)
-
-4. CONSTRAINT SATISFACTION PROBLEM (CSP):
-   → Hard Constraints: MUST be satisfied (no conflicts)
-   → Soft Constraints: Optimization objectives (preferences)
-   → CP-SAT finds optimal or feasible solution
-
-═══════════════════════════════════════════════════════════════════════════════
-
-Author: [Nama Mahasiswa]
-File: app.py (11,800+ lines)
-Python Version: 3.8+
-Dependencies: Flask, OR-Tools, DEAP, PyMongo, Pandas
-
-Version: 1.0 (Final)
-Last Updated: January 2026
-
-═══════════════════════════════════════════════════════════════════════════════
-"""
-
-# --- IMPORT LIBRARIES ---
-
-# ==============================================================================
-# IMPORT FLASK DAN DEPENDENCIES
-# ==============================================================================
+# --- NORMALISASI DOSEN DI schedules DAN courses (PERSIS users.json, FUZZY MATCH) ---
 from difflib import get_close_matches
+
+def normalize_all_lecturer_names():
+    # Ambil semua nama dosen dari users (role: dosen)
+    all_dosen = set()
+    for u in users_collection.find({"role": "dosen"}):
+        all_dosen.add(u["name"].strip())
+
+    # Buat mapping nama dosen lower-case ke nama aslinya (untuk pencocokan case-insensitive)
+    lower_to_canonical = {d.lower().replace('.', '').replace(',', '').replace(' ', ''): d for d in all_dosen}
+
+    def find_best_match(name):
+        name_clean = name.strip().lower().replace('.', '').replace(',', '').replace(' ', '')
+        if name_clean in lower_to_canonical:
+            return lower_to_canonical[name_clean]
+        matches = get_close_matches(name_clean, lower_to_canonical.keys(), n=1, cutoff=0.7)
+        if matches:
+            return lower_to_canonical[matches[0]]
+        return None
+
+    # Normalisasi field 'dosen' di schedules
+    updated_schedules = 0
+    for sched in schedules_collection.find():
+        dosen = sched.get("dosen")
+        if dosen:
+            match = find_best_match(dosen)
+            if match and match != dosen:
+                schedules_collection.update_one({"_id": sched["_id"]}, {"$set": {"dosen": match}})
+                updated_schedules += 1
+
+    # Normalisasi field 'selected_by' di courses
+    updated_courses = 0
+    for c in courses_collection.find():
+        sb = c.get("selected_by", [])
+        if isinstance(sb, str):
+            sb = [sb]
+        new_sb = []
+        changed = False
+        for d in sb:
+            match = find_best_match(d)
+            if match:
+                new_sb.append(match)
+                if match != d:
+                    changed = True
+            else:
+                new_sb.append(d)
+        if changed:
+            courses_collection.update_one({"_id": c["_id"]}, {"$set": {"selected_by": new_sb}})
+            updated_courses += 1
+
+    print(f"[NORMALISASI] {updated_schedules} jadwal dan {updated_courses} courses diupdate agar nama dosen sesuai users.json.")
+    return updated_schedules, updated_courses
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify
 from pymongo import MongoClient
 from werkzeug.utils import secure_filename
@@ -239,150 +61,44 @@ import io
 import math
 import pandas as pd
 import random
-from deap import base, creator, tools, algorithms  # Library untuk Genetic Algorithm
+import time
+from deap import base, creator, tools, algorithms
 from datetime import datetime
 import itertools
 import logging
 from logger import setup_logger
-# ==============================================================================
-# FUNGSI NORMALISASI NAMA DOSEN
-# ==============================================================================
-
-def normalize_all_lecturer_names():
-    """
-    Normalisasi nama dosen di schedules dan courses agar sesuai dengan users.json
-    menggunakan fuzzy matching untuk menangani variasi penulisan nama.
-    
-    Fungsi ini:
-    - Mengambil semua nama dosen dari collection users (role: dosen)
-    - Membuat mapping nama yang dinormalisasi (lowercase, tanpa spasi/tanda baca)
-    - Mencocokkan nama dosen di schedules dan courses dengan fuzzy matching
-    - Update nama dosen yang tidak sesuai dengan nama canonical dari users
-    
-    Returns:
-        tuple: (jumlah schedules yang diupdate, jumlah courses yang diupdate)
-        
-    Example:
-        >>> updated_schedules, updated_courses = normalize_all_lecturer_names()
-        >>> print(f"Updated: {updated_schedules} schedules, {updated_courses} courses")
-    """
-    # Ambil semua nama dosen dari users (role: dosen) sebagai referensi canonical
-    all_dosen = set()
-    for u in users_collection.find({"role": "dosen"}):
-        all_dosen.add(u["name"].strip())
-
-    # Buat mapping nama dosen lower-case ke nama aslinya 
-    # untuk pencocokan case-insensitive dan toleran terhadap tanda baca
-    lower_to_canonical = {
-        d.lower().replace('.', '').replace(',', '').replace(' ', ''): d 
-        for d in all_dosen
-    }
-
-    def find_best_match(name):
-        """
-        Mencari best match untuk nama dosen menggunakan fuzzy matching.
-        
-        Args:
-            name (str): Nama dosen yang akan dicocokkan
-            
-        Returns:
-            str atau None: Nama canonical jika ditemukan, None jika tidak
-        """
-        name_clean = name.strip().lower().replace('.', '').replace(',', '').replace(' ', '')
-        
-        # Cek exact match terlebih dahulu
-        if name_clean in lower_to_canonical:
-            return lower_to_canonical[name_clean]
-        
-        # Gunakan fuzzy matching jika tidak ada exact match (cutoff=0.7 atau 70% similarity)
-        matches = get_close_matches(name_clean, lower_to_canonical.keys(), n=1, cutoff=0.7)
-        if matches:
-            return lower_to_canonical[matches[0]]
-        return None
-
-    # Normalisasi field 'dosen' di collection schedules
-    updated_schedules = 0
-    for sched in schedules_collection.find():
-        dosen = sched.get("dosen")
-        if dosen:
-            match = find_best_match(dosen)
-            if match and match != dosen:
-                schedules_collection.update_one(
-                    {"_id": sched["_id"]}, 
-                    {"$set": {"dosen": match}}
-                )
-                updated_schedules += 1
-
-    # Normalisasi field 'selected_by' di collection courses
-    updated_courses = 0
-    for c in courses_collection.find():
-        sb = c.get("selected_by", [])
-        
-        # Handle jika selected_by adalah string, convert ke list
-        if isinstance(sb, str):
-            sb = [sb]
-        
-        new_sb = []
-        changed = False
-        for d in sb:
-            match = find_best_match(d)
-            if match:
-                new_sb.append(match)
-                if match != d:
-                    changed = True
-            else:
-                new_sb.append(d)  # Keep original jika tidak ada match
-        
-        if changed:
-            courses_collection.update_one(
-                {"_id": c["_id"]}, 
-                {"$set": {"selected_by": new_sb}}
-            )
-            updated_courses += 1
-
-    print(f"[NORMALISASI] {updated_schedules} jadwal dan {updated_courses} courses "
-          f"diupdate agar nama dosen sesuai users.json.")
-    return updated_schedules, updated_courses
-
-
-# Import OR-Tools untuk Constraint Programming dan Optimization
 try:
-    from ortools.sat.python import cp_model
+    from ortools.sat.python import cp_model  # Tambahkan import OR-Tools
     ORTOOLS_AVAILABLE = True
 except ImportError:
     ORTOOLS_AVAILABLE = False
     cp_model = None
     print("WARNING: ortools not installed. Some optimization features will be disabled.")
 
-# Configure logging untuk tracking dan debugging
-logging.basicConfig(
-    level=logging.INFO, 
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-# ==============================================================================
-# KONFIGURASI APLIKASI
-# ==============================================================================
+# ------------------------------
+# CONFIGURATION
+# ------------------------------
 
-APP_SECRET = "secret_key"  # Secret key untuk session management
-UPLOAD_FOLDER = "uploads"  # Folder untuk upload file CSV/Excel
-ALLOWED_EXTENSIONS = {'csv', 'xlsx'}  # Format file yang diizinkan
+APP_SECRET = "secret_key"
+UPLOAD_FOLDER = "uploads"
+ALLOWED_EXTENSIONS = {'csv', 'xlsx'}
 
-# Daftar ruangan berdasarkan kategori
-# Ruangan non-lab digunakan untuk mata kuliah teori
+# Room lists as per task requirements
 NON_LAB_ROOMS = [
     'Infor 1', 'Infor 2', 'Infor 3', 'Infor 4', 'Infor 5', 
     'Jawa 8A', 'Jawa 8B'
 ]
 
-# Ruangan lab digunakan untuk mata kuliah praktikum
 LAB_ROOMS = [
     'Lab 1', 'Lab 2', 'Lab 3', 'Lab 4'
 ]
 
-# Kapasitas maksimum per section berdasarkan jenis ruangan
-MAX_CLASS_SIZE_NON_LAB = 45  # Kapasitas maksimal ruangan teori
-MAX_CLASS_SIZE_LAB = 36      # Kapasitas maksimal ruangan praktikum
+# Kapasitas maksimum per section
+MAX_CLASS_SIZE_NON_LAB = 45  # Teori di ruangan non-lab
+MAX_CLASS_SIZE_LAB = 36      # Praktikum di laboratorium
 
 REQUIRED_NON_LAB_SECTIONS = 40
 REQUIRED_LAB_SECTIONS = 36
@@ -392,189 +108,82 @@ MIN_SKS_PER_DOSEN = 8        # Minimum wajib mengajar
 MAX_SKS_PER_DOSEN = 12       # Maximum SKS per dosen
 # Tidak ada batas maksimal MK per dosen (penguji minta bebas pilih)
 MAX_COURSES_PER_DOSEN = None
+# Note: MIN/MAX_SECTIONS_PER_DOSEN tidak digunakan lagi untuk distribusi section
+# Section distribution sekarang dihitung secara dinamis berdasarkan SKS dan jumlah dosen
+MIN_SECTIONS_PER_DOSEN = 4   # Legacy (tidak digunakan dalam distribusi baru)
+MAX_SECTIONS_PER_DOSEN = 6   # Legacy (tidak digunakan dalam distribusi baru)
 
-# ==============================================================================
-# CONSTRAINT PARAMETERS UNTUK DISTRIBUSI SECTION PER DOSEN
-# ==============================================================================
-
-# Note: MIN/MAX_SECTIONS_PER_DOSEN adalah legacy constants
-# Section distribution sekarang dihitung secara dinamis berdasarkan:
-# - Total SKS mata kuliah
-# - Jumlah dosen yang tersedia
-# - Beban kerja saat ini per dosen (untuk distribusi merata)
-MIN_SECTIONS_PER_DOSEN = 4   # Legacy (tidak digunakan dalam algoritma distribusi baru)
-MAX_SECTIONS_PER_DOSEN = 6   # Legacy (tidak digunakan dalam algoritma distribusi baru)
-
-# ==============================================================================
-# KONFIGURASI WAKTU DAN HARI PERKULIAHAN
-# ==============================================================================
-
-# Hari-hari perkuliahan yang tersedia
 POSSIBLE_DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat']
-
-# Waktu mulai yang mungkin untuk jadwal (hanya untuk referensi legacy)
 POSSIBLE_STARTS = ['08:00', '10:00', '13:00', '15:00']
+SKS_TO_MINUTES = {1: 100, 2: 100, 3: 150}  # 1-2 SKS = 100 minutes, 3 SKS = 150 minutes
 
-# Mapping SKS ke durasi dalam menit
-# 1 SKS = 50 menit akademik, dengan break time = 100 menit
-# 2 SKS = 100 menit (2 × 50 menit)
-# 3 SKS = 150 menit (3 × 50 menit)
-SKS_TO_MINUTES = {
-    1: 100,   # 1 SKS = 100 menit (termasuk break)
-    2: 100,   # 2 SKS = 100 menit
-    3: 150    # 3 SKS = 150 menit (2.5 jam)
-}
-
-# ==============================================================================
-# TIME BLOCKS UNTUK PENJADWALAN
-# ==============================================================================
-
-# Canonical timeblocks untuk hari Senin-Kamis
-# Format: {SKS: [list of time ranges]}
+# Canonical timeblocks (Mon-Thu) and Friday-special blocks
 TIMEBLOCKS = {
-    # 1 SKS (50 menit per slot)
     1: ["08:00-08:50", "08:50-09:40", "09:40-10:30", "10:30-11:20", "11:20-12:10",
         "14:00-14:50", "14:50-15:40", "15:40-16:30"],
-    
-    # 2 SKS (100 menit = 2 slot)
     2: ["08:00-09:40", "09:40-11:20", "10:30-12:10", "11:20-13:00",
         "14:00-15:40", "15:40-17:20"],
-    
-    # 3 SKS (150 menit = 3 slot)
-    3: ["08:00-10:30", "09:40-12:10", "10:40-13:10", "14:00-16:30"]
+    3: ["08:00-10:30", "10:40-13:10", "14:00-16:30"]  # FIXED: Only standard lab blocks
 }
 
-# Timeblocks khusus untuk hari Jumat (menghormati waktu sholat Jumat)
-# Batasan: kelas pagi maksimal sampai 12:10, kemudian dilanjut setelah 14:00
 TIMEBLOCKS_JUMAT = {
     1: ["08:00-08:50", "08:50-09:40", "09:40-10:30", "10:30-11:20", "11:20-12:10",
         "14:00-14:50", "14:50-15:40", "15:40-16:30"],
-    
     2: ["08:00-09:40", "09:40-11:20", "10:30-12:10",
         "14:00-15:40", "15:40-17:20"],
-    
-    # Jumat: blok 3 SKS tidak boleh melintasi waktu sholat Jumat
-    3: ["08:00-10:30", "09:40-12:10", "14:00-16:30"]
+    3: ["08:00-10:30", "14:00-16:30"]  # FIXED: Friday only 2 lab blocks (no 10:40-13:10 to respect break)
 }
 
 def get_timeblocks_for_day(day, sks):
-    """
-    Mendapatkan time blocks yang sesuai berdasarkan hari dan SKS.
-    
-    Hari Jumat memiliki keterbatasan waktu karena waktu sholat Jumat,
-    sehingga menggunakan TIMEBLOCKS_JUMAT yang menghindari slot 12:10-14:00.
-    
-    Args:
-        day (str): Nama hari ('Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat')
-        sks (int): Jumlah SKS mata kuliah (1, 2, atau 3)
-        
-    Returns:
-        list: List of time range strings (e.g., ["08:00-09:40", "09:40-11:20"])
-        
-    Example:
-        >>> get_timeblocks_for_day('Jumat', 3)
-        ["08:00-10:30", "09:40-12:10", "14:00-16:30"]
-        
-        >>> get_timeblocks_for_day('Senin', 2)
-        ["08:00-09:40", "09:40-11:20", "10:30-12:10", "11:20-13:00", 
-         "14:00-15:40", "15:40-17:20"]
-    """
+    """Return appropriate time blocks based on day and SKS (Friday has stricter morning cutoff)."""
     if day == 'Jumat':
         return TIMEBLOCKS_JUMAT.get(sks, TIMEBLOCKS_JUMAT[3])
     return TIMEBLOCKS.get(sks, TIMEBLOCKS[3])
 
-# ==============================================================================
-# CONSTRAINT PARAMETERS UNTUK DISTRIBUSI KELAS PER HARI
-# ==============================================================================
+# New constraints
+MAX_CLASSES_MON_THU = 20
+MIN_CLASSES_FRI = 10
+MAX_CLASSES_FRI = 15
+MAX_CONSECUTIVE_DAYS = 3
 
-# Batasan jumlah kelas per hari untuk distribusi optimal
-MAX_CLASSES_MON_THU = 20   # Maksimal 20 kelas untuk Senin-Kamis
-MIN_CLASSES_FRI = 10        # Minimal 10 kelas untuk Jumat
-MAX_CLASSES_FRI = 15        # Maksimal 15 kelas untuk Jumat (lebih sedikit dari hari lain)
-
-# Batasan hari berturut-turut untuk dosen yang sama
-MAX_CONSECUTIVE_DAYS = 3    # Dosen maksimal mengajar 3 hari berturut-turut
-
-# ==============================================================================
-# PENALTY CONSTANTS UNTUK FITNESS FUNCTION
-# ==============================================================================
-
-# Konstanta penalty untuk mencegah konflik dalam Genetic Algorithm
-MAX_SAME_COURSE_DIFF_DAY_PENALTY = 10**30  # Penalty sangat besar jika mata kuliah yang sama di hari berbeda
-MAX_CONFLICT_PENALTY = 10**25               # Penalty untuk bentrok waktu/ruangan
-
-
-# ==============================================================================
-# INISIALISASI FLASK APPLICATION
-# ==============================================================================
+# Konstanta baru untuk mencegah konflik dan meningkatkan penalti
+MAX_SAME_COURSE_DIFF_DAY_PENALTY = 10**30  # Penalti sangat besar jika 2 MK di hari berbeda
+MAX_CONFLICT_PENALTY = 10**25             # Penalti untuk bentrok waktu/ruangan
 
 app = Flask(__name__)
-app.secret_key = APP_SECRET  # Set secret key untuk session management
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER  # Konfigurasi folder upload
+app.secret_key = APP_SECRET
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# Set up logger untuk monitoring dan debugging
+# Set up logger
 logger = setup_logger()
 
-# Buat folder upload jika belum ada
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
-# ==============================================================================
-# DUMMY CLASSES UNTUK MONGODB FALLBACK
-# ==============================================================================
-# Classes ini digunakan jika koneksi MongoDB gagal, mencegah aplikasi crash
-
+# Lightweight fallback objects when MongoDB is unavailable.
 class DummyCollection:
-    """
-    Dummy MongoDB collection untuk fallback jika database tidak tersedia.
-    Semua method return empty results atau None.
-    """
     def find(self, *args, **kwargs):
-        """Return empty list untuk query find()"""
         return []
-    
     def find_one(self, *args, **kwargs):
-        """Return None untuk query find_one()"""
         return None
-    
     def count_documents(self, *args, **kwargs):
-        """Return 0 untuk count_documents()"""
         return 0
-    
     def insert_one(self, *args, **kwargs):
-        """Return None untuk insert_one()"""
         return None
-    
     def insert_many(self, *args, **kwargs):
-        """Return None untuk insert_many()"""
         return None
-    
     def delete_many(self, *args, **kwargs):
-        """Return None untuk delete_many()"""
         return None
-    
     def delete_one(self, *args, **kwargs):
-        """Return None untuk delete_one()"""
         return None
-    
     def update_one(self, *args, **kwargs):
-        """Return None untuk update_one()"""
         return None
-    
     def update_many(self, *args, **kwargs):
-        """Return None untuk update_many()"""
         return None
-    
     def aggregate(self, *args, **kwargs):
-        """Return empty list untuk aggregate()"""
         return []
-
 
 class DummyDB:
-    """
-    Dummy MongoDB database untuk fallback jika koneksi ke database gagal.
-    Provides dummy collections untuk semua collection yang digunakan aplikasi.
-    """
     def __init__(self):
         self.schedules = DummyCollection()
         self.sections = DummyCollection()
@@ -584,14 +193,11 @@ class DummyDB:
         self.active_students = DummyCollection()
 
 
-# ==============================================================================
-# UTILITY FUNCTIONS UNTUK MANAJEMEN DATA MAHASISWA AKTIF
-# ==============================================================================
+# ------------------------------
+# ACTIVE STUDENT COUNTS & SECTION NEEDS
+# ------------------------------
 
-# Konstanta untuk semester keys (1-8 atau I-VIII)
-SEMESTER_KEYS = [str(i) for i in range(1, 9)]  # ['1', '2', '3', ..., '8']
-
-# Mapping untuk konversi semester Romawi ke angka
+SEMESTER_KEYS = [str(i) for i in range(1, 9)]
 SEMESTER_ROMAN_MAP = {
     "I": "1", "II": "2", "III": "3", "IV": "4",
     "V": "5", "VI": "6", "VII": "7", "VIII": "8"
@@ -599,75 +205,26 @@ SEMESTER_ROMAN_MAP = {
 
 
 def normalize_semester_key(value):
-    """
-    Normalisasi nilai semester dari berbagai format (angka, Romawi, string)
-    menjadi format string digit standar.
-    
-    Fungsi ini menangani berbagai input format:
-    - Angka: 1, 2, 3, ... → "1", "2", "3", ...
-    - Romawi: "I", "II", "III", ... → "1", "2", "3", ...
-    - String angka: "1", "2.0", " 3 " → "1", "2", "3"
-    - Float: 1.0, 2.0 → "1", "2"
-    
-    Args:
-        value: Input semester (int, float, string, atau None)
-        
-    Returns:
-        str: Semester dalam format string digit, atau string kosong jika invalid
-        
-    Example:
-        >>> normalize_semester_key("III")
-        "3"
-        >>> normalize_semester_key(5)
-        "5"
-        >>> normalize_semester_key("  II  ")
-        "2"
-        >>> normalize_semester_key(None)
-        ""
-    """
+    """Normalize semester value (numeric or Roman) to string digit form, else return stripped string."""
     if value is None:
         return ""
-    
     s = str(value).strip()
     if not s:
         return ""
-    
-    # Cek apakah Romawi
     up = s.upper()
     if up in SEMESTER_ROMAN_MAP:
         return SEMESTER_ROMAN_MAP[up]
-    
-    # Coba convert ke int (handle float seperti "2.0")
     try:
         return str(int(float(s)))
     except Exception:
-        return s  # Return as-is jika tidak bisa diparse
+        return s
 
 
 def load_active_student_counts():
-    """
-    Load jumlah mahasiswa aktif per semester dari database.
-    
-    Fungsi ini mengambil data jumlah mahasiswa aktif dari collection active_students
-    dan mengembalikan dictionary dengan semester sebagai key dan jumlah mahasiswa sebagai value.
-    Jika data tidak ada atau error, return default 0 untuk setiap semester.
-    
-    Returns:
-        dict: Dictionary dengan format {semester: jumlah_mahasiswa}
-              Contoh: {"1": 45, "2": 38, "3": 42, ..., "8": 15}
-              
-    Example:
-        >>> counts = load_active_student_counts()
-        >>> print(f"Semester 1: {counts['1']} mahasiswa")
-        Semester 1: 45 mahasiswa
-    """
-    # Inisialisasi dengan 0 untuk semua semester
+    """Return dict semester->jumlah mahasiswa aktif (default 0 jika belum diisi)."""
     counts = {sem: 0 for sem in SEMESTER_KEYS}
-    
-    # Cek apakah collection tersedia
     if 'active_students_collection' not in globals() or active_students_collection is None:
         return counts
-    
     try:
         for doc in active_students_collection.find():
             sem = str(doc.get("semester", "")).strip()
@@ -678,47 +235,22 @@ def load_active_student_counts():
             except Exception:
                 continue
     except Exception:
-        pass  # Jika error, kembalikan counts dengan nilai default (0)
-    
+        pass
     return counts
 
 
 def upsert_active_student_counts(counts):
-    """
-    Simpan atau update jumlah mahasiswa aktif per semester ke database.
-    
-    Fungsi ini menggunakan upsert operation (update if exists, insert if not)
-    untuk menyimpan jumlah mahasiswa aktif untuk setiap semester.
-    
-    Args:
-        counts (dict): Dictionary dengan format {semester: jumlah_mahasiswa}
-                       Contoh: {"1": 45, "2": 38, "3": 42, ..., "8": 15}
-                       
-    Returns:
-        bool: True jika berhasil, False jika gagal atau collection tidak tersedia
-        
-    Example:
-        >>> counts = {"1": 45, "2": 38, "3": 42}
-        >>> success = upsert_active_student_counts(counts)
-        >>> print(f"Save {'berhasil' if success else 'gagal'}")
-    """
+    """Simpan/update jumlah mahasiswa aktif per semester."""
     if 'active_students_collection' not in globals() or active_students_collection is None:
         return False
-    
     for sem in SEMESTER_KEYS:
         try:
             val = int(counts.get(sem, 0))
         except Exception:
             val = 0
-        
-        # Upsert: update jika ada, insert jika tidak ada
         active_students_collection.update_one(
             {"semester": sem},
-            {"$set": {
-                "semester": sem, 
-                "count": val, 
-                "updated_at": datetime.utcnow()
-            }},
+            {"$set": {"semester": sem, "count": val, "updated_at": datetime.utcnow()}},
             upsert=True,
         )
     return True
@@ -726,81 +258,32 @@ def upsert_active_student_counts(counts):
 
 def compute_required_sections_for_course(course, student_counts):
     """
-    Hitung kebutuhan jumlah section untuk mata kuliah berdasarkan jumlah mahasiswa aktif.
-    
-    Formula perhitungan:
-    - Ambil jumlah mahasiswa aktif di semester mata kuliah tersebut
-    - Tentukan kapasitas maksimal per section:
-      * Praktikum (is_lab=True): 36 mahasiswa per section
-      * Teori (is_lab=False): 45 mahasiswa per section
-    - Jumlah section = ceil(jumlah_mahasiswa / kapasitas)
-    
-    Args:
-        course (dict): Data mata kuliah dengan fields:
-                       - semester: semester mata kuliah (1-8, I-VIII, atau string)
-                       - is_lab: True untuk praktikum, False untuk teori
-        student_counts (dict): Dictionary {semester: jumlah_mahasiswa_aktif}
-        
-    Returns:
-        int: Jumlah section yang dibutuhkan (0 jika semester tidak valid atau mahasiswa 0)
-        
-    Example:
-        >>> course = {"name": "Algoritma", "semester": "3", "is_lab": False}
-        >>> student_counts = {"3": 90}
-        >>> sections_needed = compute_required_sections_for_course(course, student_counts)
-        >>> print(f"Butuh {sections_needed} section")
-        Butuh 2 section  # ceil(90/45) = 2
-        
-        >>> course_lab = {"name": "Praktikum Basis Data", "semester": "4", "is_lab": True}
-        >>> student_counts = {"4": 100}
-        >>> sections_needed = compute_required_sections_for_course(course_lab, student_counts)
-        >>> print(f"Butuh {sections_needed} section lab")
-        Butuh 3 section lab  # ceil(100/36) = 3
+    Hitung kebutuhan section berdasarkan jumlah mahasiswa aktif per semester dan jenis kelas.
+    - Teori: kapasitas 45 (non-lab)
+    - Praktikum: kapasitas 36 (lab)
+    Return 0 jika semester tidak diketahui atau jumlah mahasiswa 0.
     """
-    # Normalisasi semester key
     sem_key = normalize_semester_key(course.get("semester", ""))
     if not sem_key:
         return 0
 
-    # Ambil jumlah mahasiswa untuk semester ini
     try:
         student_count = int(student_counts.get(sem_key, 0) or 0)
     except Exception:
         student_count = 0
 
-    # Tentukan kapasitas berdasarkan jenis kelas
     capacity = MAX_CLASS_SIZE_LAB if course.get("is_lab", False) else MAX_CLASS_SIZE_NON_LAB
-    
     if capacity <= 0 or student_count <= 0:
         return 0
-    
-    # Hitung jumlah section (round up)
     return math.ceil(student_count / capacity)
 
 
-# ==============================================================================
-# UTILITY FUNCTIONS UNTUK PARSING DAN KONVERSI WAKTU
-# ==============================================================================
+# ------------------------------
+# HELPER FUNCTIONS
+# ------------------------------
 
 def _parse_minutes(time_str):
-    """
-    Parse string waktu (format HH:MM atau HH:MM:SS) menjadi menit sejak midnight.
-    
-    Args:
-        time_str (str): String waktu dalam format "HH:MM" atau "HH:MM:SS"
-                        Contoh: "08:00", "14:30", "09:15:00"
-                        
-    Returns:
-        int atau None: Menit sejak midnight (0-1439), atau None jika tidak valid
-        
-    Example:
-        >>> _parse_minutes("08:00")
-        480  # 8 * 60 = 480 menit
-        >>> _parse_minutes("14:30")
-        870  # 14 * 60 + 30 = 870 menit
-        >>> _parse_minutes("invalid")
-        None
-    """
+    """Parse a time string like 'HH:MM' or 'HH:MM:SS' into minutes since midnight. Return None if not parseable."""
     if not time_str:
         return None
     try:
@@ -812,63 +295,24 @@ def _parse_minutes(time_str):
         return None
 
 def _minutes_to_time(minutes):
-    """
-    Convert menit sejak midnight menjadi string waktu format HH:MM.
-    
-    Args:
-        minutes (int): Menit sejak midnight (0-1439)
-        
-    Returns:
-        str: String waktu dalam format "HH:MM"
-        
-    Example:
-        >>> _minutes_to_time(480)
-        "08:00"
-        >>> _minutes_to_time(870)
-        "14:30"
-    """
+    """Convert minutes since midnight to HH:MM string."""
     h = minutes // 60
     m = minutes % 60
     return f"{h:02d}:{m:02d}"
 
 def get_valid_starts(day, duration_minutes):
     """
-    Mendapatkan daftar waktu mulai yang valid untuk hari dan durasi tertentu.
-    
-    Fungsi ini mempertimbangkan:
-    - Blok waktu yang tersedia per hari
-    - Durasi kelas yang dibutuhkan
-    - Batasan khusus untuk hari Jumat (istirahat sholat Jumat 12:10-14:00)
-    
-    Blok waktu tersedia:
-    - Senin-Kamis: 08:00-12:10 (250 menit), 14:00-16:30 (150 menit)
-    - Jumat: 08:00-12:10 (250 menit), 14:00-16:30 (150 menit)
-    
-    Args:
-        day (str): Nama hari ('Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat')
-        duration_minutes (int): Durasi kelas dalam menit
-                                - 100 menit untuk 1-2 SKS
-                                - 150 menit untuk 3 SKS
-                                
-    Returns:
-        list: List of valid start times sebagai string "HH:MM"
-              Waktu mulai dipilih dengan interval 10 menit
-              
-    Example:
-        >>> get_valid_starts('Senin', 100)
-        ['08:00', '08:10', '08:20', ..., '10:50', '14:00', '14:10', '14:20', '15:00']
-        
-        >>> get_valid_starts('Jumat', 150)
-        ['08:00', '08:10', '08:20', '09:00', '14:00']
+    Get valid start times for a given day and duration.
+    Duration is in minutes, e.g., 100 for 1-2 SKS, 150 for 3 SKS.
     """
     if day == "Jumat":
-        # Jumat: blok pagi 08:00-12:10, istirahat sholat Jumat, sore 14:00-16:30
+        # Jumat: 08:00-12:10 (sama seperti hari lain), istirahat Jumat 12:10-14:00, then 14:00-16:30
         available_blocks = [
-            ("08:00", 250),  # 08:00 to 12:10 (250 min)
+            ("08:00", 250),  # 08:00 to 12:10 (250 min) - SAMA dengan hari lain
             ("14:00", 150),  # 14:00 to 16:30 (150 min)
         ]
     else:
-        # Senin-Kamis: blok pagi 08:00-12:10, break, sore 14:00-16:30
+        # Senin-Kamis: 08:00-12:10, break, 14:00-16:30
         available_blocks = [
             ("08:00", 250),  # 08:00 to 12:10 (250 min)
             ("14:00", 150),  # 14:00 to 16:30 (150 min)
@@ -891,59 +335,17 @@ def get_valid_starts(day, duration_minutes):
     return valid_starts
 
 def calculate_end_time(start_str, duration_minutes):
-    """
-    Hitung waktu selesai berdasarkan waktu mulai dan durasi.
-    
-    Args:
-        start_str (str): Waktu mulai dalam format "HH:MM"
-        duration_minutes (int): Durasi dalam menit
-        
-    Returns:
-        str: Waktu selesai dalam format "HH:MM"
-        
-    Example:
-        >>> calculate_end_time("08:00", 100)
-        "09:40"  # 8:00 + 100 menit = 9:40
-        >>> calculate_end_time("14:00", 150)
-        "16:30"  # 14:00 + 150 menit = 16:30
-    """
+    """Calculate end time given start and duration in minutes."""
     start_min = _parse_minutes(start_str)
     if start_min is None:
-        return start_str  # fallback jika parsing gagal
+        return start_str  # fallback
     end_min = start_min + duration_minutes
     return _minutes_to_time(end_min)
 
 def _times_overlap(s1, e1, s2, e2):
-    """
-    Cek apakah dua time interval overlap (tumpang tindih).
-    
-    Logic: Dua interval [s1, e1) dan [s2, e2) OVERLAP jika:
-    - s1 < e2 AND s2 < e1
-    
-    Artinya: Start yang satu terjadi sebelum end yang lain, dan vice versa.
-    
-    Args:
-        s1 (int atau None): Start time interval 1 (menit sejak midnight)
-        e1 (int atau None): End time interval 1 (menit sejak midnight)
-        s2 (int atau None): Start time interval 2 (menit sejak midnight)
-        e2 (int atau None): End time interval 2 (menit sejak midnight)
-        
-    Returns:
-        bool: True jika overlap, False jika tidak overlap
-              Jika ada None value, return True (safe assumption = ada kemungkinan overlap)
-    
-    Example:
-        >>> _times_overlap(480, 580, 540, 640)  # 08:00-09:40 vs 09:00-10:40
-        True  # Overlap dari 09:00-09:40
-        
-        >>> _times_overlap(480, 580, 600, 700)  # 08:00-09:40 vs 10:00-11:40
-        False  # Tidak overlap, ada gap 20 menit
-        
-        >>> _times_overlap(480, None, 540, 640)  # Salah satu None
-        True  # Safe assumption: assume overlap
-    """
+    """Return True if time intervals [s1,e1) and [s2,e2) overlap. Inputs are minutes ints or None."""
     if s1 is None or e1 is None or s2 is None or e2 is None:
-        # Jika tidak bisa parse times, play safe dan assume possible overlap
+        # if we cannot parse times, play safe and assume possible overlap
         return True
     return (s1 < e2) and (s2 < e1)
 
@@ -951,82 +353,67 @@ def _times_overlap(s1, e1, s2, e2):
 # MONGODB CONNECTION
 # ------------------------------
 
+# try:
+#     client = MongoClient(
+#         "mongodb+srv://salamull1005:Jabbar1005@schedules.fb8isvj.mongodb.net/?appName=schedules",
+#         tls=True,
+#         tlsAllowInvalidCertificates=True,
+#         serverSelectionTimeoutMS=10000,
+#         connectTimeoutMS=10000,
+#         socketTimeoutMS=10000
+#     )
+#     client.server_info()  # Test connection immediately
+#     db = client["schedule_db"]
+#     schedules_collection = db["schedules"]
+#     users_collection = db["users"]
+#     courses_collection = db["courses"]
+#     unavailability_reports_collection = db["unavailability_reports"]
+#     sections_collection = db["sections"]
+#     active_students_collection = db["active_students"]
+#     # New collection for GA-generated sections (before time/room scheduling)
+#     try:
+#         sections_collection = db["sections"]
+#     except Exception:
+#         sections_collection = None
+#     print("MongoDB Atlas connection: SUCCESS")
+# except Exception as e:
+#     print(f"MongoDB Atlas connection: FAILED\n{e}")
+#     # Provide safe dummy objects so the app routes won't crash when DB is down.
+#     db = DummyDB()
+#     schedules_collection = db.schedules
+#     users_collection = db.users
+#     courses_collection = db.courses
+#     unavailability_reports_collection = db.unavailability_reports
+#     sections_collection = getattr(db, "sections", None)
+#     active_students_collection = getattr(db, "active_students", None)
+
+
 try:
+    # KONEKSI KE MONGODB LOCAL
     client = MongoClient(
-        "mongodb+srv://salamull1005:Jabbar1005@schedules.fb8isvj.mongodb.net/?appName=schedules",
-        tls=True,
-        tlsAllowInvalidCertificates=True,
-        serverSelectionTimeoutMS=10000,
-        connectTimeoutMS=10000,
-        socketTimeoutMS=10000
+        "mongodb://localhost:27017",
+        serverSelectionTimeoutMS=5000
     )
-    client.server_info()  # Test connection immediately
+
+    # Test koneksi
+    client.admin.command("ping")
+
     db = client["schedule_db"]
+
     schedules_collection = db["schedules"]
     users_collection = db["users"]
     courses_collection = db["courses"]
     unavailability_reports_collection = db["unavailability_reports"]
     sections_collection = db["sections"]
     active_students_collection = db["active_students"]
-    # New collection for GA-generated sections (before time/room scheduling)
-    try:
-        sections_collection = db["sections"]
-    except Exception:
-        sections_collection = None
-    print("MongoDB Atlas connection: SUCCESS")
+    removed_sections_collection = db["removed_sections"]  # Log section yang dihapus
+
+    print("MongoDB LOCAL connection: SUCCESS")
+
 except Exception as e:
-    print(f"MongoDB Atlas connection: FAILED\n{e}")
-    # Provide safe dummy objects so the app routes won't crash when DB is down.
-    db = DummyDB()
-    schedules_collection = db.schedules
-    users_collection = db.users
-    courses_collection = db.courses
-    unavailability_reports_collection = db.unavailability_reports
-    sections_collection = getattr(db, "sections", None)
-    active_students_collection = getattr(db, "active_students", None)
+    print(f"MongoDB LOCAL connection: FAILED\n{e}")
 
-
-# ==============================================================================
-# MONGODB DATABASE CONNECTION
-# ==============================================================================
-
-# try:
-#     # KONEKSI KE MONGODB LOCAL
-#     # MongoDB digunakan untuk menyimpan semua data sistem:
-#     # - users: Dosen dan koordinator
-#     # - courses: Mata kuliah
-#     # - sections: Section hasil GA optimization
-#     # - schedules: Jadwal final hasil OR-Tools scheduling
-#     # - unavailability_reports: Request reschedule dari dosen
-#     # - active_students: Jumlah mahasiswa aktif per semester
-    
-#     client = MongoClient(
-#         "mongodb://localhost:27017",
-#         serverSelectionTimeoutMS=5000  # Timeout 5 detik untuk koneksi
-#     )
-
-#     # Test koneksi dengan ping command
-#     client.admin.command("ping")
-
-#     # Pilih database
-#     db = client["schedule_db"]
-
-#     # Inisialisasi semua collections
-#     schedules_collection = db["schedules"]           # Collection untuk jadwal final
-#     users_collection = db["users"]                   # Collection untuk dosen dan koordinator
-#     courses_collection = db["courses"]               # Collection untuk mata kuliah
-#     unavailability_reports_collection = db["unavailability_reports"]  # Request reschedule
-#     sections_collection = db["sections"]             # Sections hasil GA
-#     active_students_collection = db["active_students"]  # Jumlah mahasiswa per semester
-#     removed_sections_collection = db["removed_sections"]  # Log section yang dihapus
-
-#     print("MongoDB LOCAL connection: SUCCESS")
-
-# except Exception as e:
-#     print(f"MongoDB LOCAL connection: FAILED\n{e}")
-
-    # Dummy fallback: jika MongoDB gagal connect, gunakan DummyDB
-    # Ini mencegah aplikasi crash saat database tidak tersedia
+    # Dummy fallback (biar app tidak crash)
     db = DummyDB()
     schedules_collection = db.schedules
     users_collection = db.users
@@ -1037,337 +424,189 @@ except Exception as e:
     removed_sections_collection = getattr(db, "removed_sections", None)
 
 
-# ==============================================================================
-# DATA INITIALIZATION: CREATE DEFAULT KOORDINATOR & LOAD INITIAL DATA
-# ==============================================================================
+# ------------------------------
+# CREATE DEFAULT KOORDINATOR
+# ------------------------------
 
 if db is not None:
-    # ─────────────────────────────────────────────────────────────────────────
-    # 1. Create default koordinator account jika belum ada
-    # ─────────────────────────────────────────────────────────────────────────
     if users_collection.count_documents({"role": "koordinator"}) == 0:
         users_collection.insert_one({
             "username": "koordinator",
-            "password": generate_password_hash("koordinator"),  # Hash password untuk keamanan
+            "password": generate_password_hash("koordinator"),
             "role": "koordinator",
             "name": "Koordinator"
         })
-        print("[INIT] Default koordinator account created")
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # 2. Load lecturers (dosen) dari CSV file jika ada
-    # ─────────────────────────────────────────────────────────────────────────
+    # Load lecturers from uploads/nama_dosen.csv
     dosen_file = os.path.join(UPLOAD_FOLDER, 'nama_dosen.csv')
     if os.path.exists(dosen_file):
         df_dosen = pd.read_csv(dosen_file)
         inserted = 0
         for _, row in df_dosen.iterrows():
-            name = row['Nama Dosen'].strip('"')  # Remove quotes jika ada
-            
-            # Cek apakah dosen sudah ada di database
+            name = row['Nama Dosen'].strip('"')
             if not users_collection.find_one({"name": name}):
-                # Generate email dari nama (lowercase, no spaces/punctuation)
                 email = name.lower().replace(' ', '').replace(',', '').replace('.', '') + "@example.com"
-                
-                # Insert dosen baru
                 users_collection.insert_one({
                     "name": name,
                     "email": email,
-                    "password": generate_password_hash("123456"),  # Default password
+                    "password": generate_password_hash("123456"),
                     "role": "dosen"
                 })
                 inserted += 1
-        print(f"[INIT] Inserted {inserted} dosen from nama_dosen.csv")
+        print(f"Inserted {inserted} dosen")
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # 3. Load courses (mata kuliah) dari Excel file jika ada
-    # ─────────────────────────────────────────────────────────────────────────
+    # Load courses from uploads/daftar_mata_kuliah.xlsx
     courses_file = os.path.join(UPLOAD_FOLDER, 'daftar_mata_kuliah.xlsx')
     if os.path.exists(courses_file):
         df_courses = pd.read_excel(courses_file)
-        inserted = 0
         for _, row in df_courses.iterrows():
             name = str(row.get("course_name", ""))
-            
-            # Cek apakah course sudah ada di database
             if name and not courses_collection.find_one({"course_name": name}):
-                # Auto-detect online courses berdasarkan keywords
-                is_online = any(keyword in name.lower() 
-                               for keyword in ['kewarganegaraan', 'kemahlikussalahan'])
+                # Check if course is Kewarganegaraan or Kemahlikussalehan (online courses)
+                is_online = any(keyword in name.lower() for keyword in ['kewarganegaraan', 'kemahlikussalahan'])
                 
-                # Insert course baru
                 courses_collection.insert_one({
                     "course_name": name,
                     "sks": int(row.get("sks", 0)),
                     "semester": str(row.get("semester", "")),
                     "is_lab": bool(row.get("is_lab", False)),
-                    "is_online": bool(row.get("is_online", is_online))
+                    "is_online": bool(row.get("is_online", is_online))  # Auto-detect or from CSV
                 })
-                inserted += 1
-        print(f"[INIT] Inserted {inserted} courses from daftar_mata_kuliah.xlsx")
     
-    # ─────────────────────────────────────────────────────────────────────────
-    # 4. Auto-update existing courses: tandai online courses
-    # ─────────────────────────────────────────────────────────────────────────
+    # Auto-update existing courses to mark online courses
     online_keywords = ['kewarganegaraan', 'kemahlikussalahan', 'kemal']
     for keyword in online_keywords:
-        result = courses_collection.update_many(
-            {"course_name": {"$regex": keyword, "$options": "i"}, 
-             "is_online": {"$ne": True}},
+        courses_collection.update_many(
+            {"course_name": {"$regex": keyword, "$options": "i"}, "is_online": {"$ne": True}},
             {"$set": {"is_online": True}}
         )
-        if result.modified_count > 0:
-            print(f"[INIT] Marked {result.modified_count} courses as online (keyword: {keyword})")
-
-
-# ==============================================================================
-# UTILITY FUNCTION: MongoDB ID Converter
-# ==============================================================================
                 
 def fix_mongo_id(data):
-    """
-    Convert MongoDB ObjectId to string untuk JSON serialization.
-    
-    MongoDB menggunakan ObjectId yang tidak bisa langsung di-serialize ke JSON.
-    Fungsi ini convert _id field dari ObjectId ke string.
-    
-    Args:
-        data (list): List of documents dari MongoDB
-        
-    Returns:
-        list: List dengan _id sudah diconvert ke string
-        
-    Example:
-        >>> docs = courses_collection.find()
-        >>> serializable_docs = fix_mongo_id(list(docs))
-        >>> json.dumps(serializable_docs)  # Now works!
-    """
     new_data = []
     for item in data:
         new_item = dict(item)
-        new_item["_id"] = str(new_item["_id"])  # Convert ObjectId to string
+        new_item["_id"] = str(new_item["_id"])  # hanya convert ID
         new_data.append(new_item)
     return new_data
 
-# ==============================================================================
+# ------------------------------
 # DEAP GENETIC ALGORITHM SETUP
-# ==============================================================================
-# DEAP (Distributed Evolutionary Algorithms in Python) digunakan untuk
-# mengoptimalkan penugasan dosen ke mata kuliah menggunakan Genetic Algorithm
+# ------------------------------
 
-# Setup DEAP Creator - hanya create sekali untuk menghindari error
 if "FitnessMin" not in creator.__dict__:
-    # FitnessMin: Fitness function dengan tujuan minimization (lower is better)
-    # weights=(-1.0,) berarti kita ingin MINIMIZE nilai fitness
     creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
-
 if "Individual" not in creator.__dict__:
-    # Individual: Representasi kromosom dalam GA
-    # Berupa list yang memiliki atribut fitness
     creator.create("Individual", list, fitness=creator.FitnessMin)
 
 def load_schedule():
-    """
-    Load jadwal dari database untuk keperluan evaluasi GA.
-    
-    Returns:
-        list: List of schedule documents dari MongoDB
-    """
     if schedules_collection is not None:
         return list(schedules_collection.find())
     return []
 
-# Master schedule: digunakan sebagai template untuk evaluasi GA
 master_schedule = load_schedule()
 
 
 def normalize_course_selected_by(courses, lecturers):
     """
-    Normalisasi field 'selected_by' pada setiap course agar berisi nama dosen
-    yang valid sesuai dengan data di collection users.
-    
-    Fungsi ini menangani berbagai format identifier (username, email, name)
-    dan memetakannya ke canonical lecturer name.
-    
-    Args:
-        courses (list): List of course documents
-        lecturers (list): List of lecturer documents
-        
-    Returns:
-        list: List of tuples (course_id, unmatched_list) untuk diagnostic
-              berisi course yang memiliki selected_by tidak ditemukan di lecturers
-              
-    Example:
-        >>> courses = [{"_id": "123", "name": "Algoritma", 
-        ...             "selected_by": ["user1", "dosen@email.com"]}]
-        >>> lecturers = [{"name": "Dr. A", "username": "user1", "email": "dosen@email.com"}]
-        >>> unmatched = normalize_course_selected_by(courses, lecturers)
-        >>> print(courses[0]["selected_by"])
-        ["Dr. A"]  # Normalized to canonical name
+    Normalize each course['selected_by'] list to contain lecturer display names.
+    Accepts values that may be stored as username, email, or name and maps them
+    to the canonical lecturer name used elsewhere in the app.
+    Returns a list of tuples (course_id, unmatched_list) for diagnostics.
     """
-    # Build set of valid lecturer names
     lecturer_names = {l['name'] for l in lecturers}
-    
-    # Build mapping dari alternative identifiers (username, email) ke display name
+    # build mapping from alternative ids to display name
     id_map = {}
     for l in lecturers:
         name = l.get('name')
         if not name:
             continue
-        id_map[name] = name  # name -> name
+        id_map[name] = name
         if l.get('username'):
-            id_map[l['username']] = name  # username -> name
+            id_map[l['username']] = name
         if l.get('email'):
-            id_map[l['email']] = name  # email -> name
+            id_map[l['email']] = name
 
     unmatched = []
     for c in courses:
         sb = c.get('selected_by', [])
-        
-        # Handle jika selected_by adalah string, convert ke list
         if isinstance(sb, str):
             sb = [sb]
-        
         normalized = []
         not_found = []
-        
         for s in sb:
             if s in id_map:
-                # Found in mapping
                 mapped = id_map[s]
                 if mapped in lecturer_names and mapped not in normalized:
                     normalized.append(mapped)
             else:
-                # Try direct match on name
+                # try direct match on name
                 if s in lecturer_names and s not in normalized:
                     normalized.append(s)
                 else:
-                    not_found.append(s)  # Tidak ditemukan
-        
-        # Update course dengan normalized selected_by
+                    not_found.append(s)
         c['selected_by'] = normalized
-        
-        # Track unmatched untuk diagnostic
         if not_found:
             unmatched.append((str(c.get('_id')), not_found))
 
     return unmatched
 
+# ------------------------------
+# CALCULATE SCHEDULE PROBABILITY/CONFIDENCE
+# ------------------------------
 
-# ==============================================================================
-# GENETIC ALGORITHM FITNESS FUNCTION
-# ==============================================================================
+def calculate_schedule_probability(slot, courses, lecturers):
+    """
+    Calculate probability/confidence level for a scheduled slot.
+    Returns value between 0-100 representing how likely this schedule is optimal.
+    
+    Factors considered:
+    1. Preference match (50%): Is lecturer in selected_by for this course?
+    2. Match quality (30%): Excellent=100, Good=75, Acceptable=50, Poor=0
+    3. Availability (20%): Based on preference score
+    """
+    try:
+        # Get base match quality
+        match_quality = slot.get('match_quality', 'Acceptable')
+        quality_score = {
+            'Excellent': 100,
+            'Good': 75,
+            'Acceptable': 50,
+            'Poor': 0
+        }.get(match_quality, 50)
+        
+        # Get preference score (0-100)
+        pref_score = slot.get('preference_score', 50)
+        
+        # Get lecturer preference match
+        course_name = slot.get('course_name', '')
+        dosen_name = slot.get('dosen', '')
+        
+        preference_match = 50  # Default
+        if course_name and dosen_name:
+            # Find course in database
+            course = next((c for c in courses if c.get('course_name') == course_name or c.get('name') == course_name), None)
+            if course:
+                selected_by = course.get('selected_by', [])
+                # Normalize lecturer name for comparison
+                if dosen_name in selected_by or any(dosen_name.lower() in str(s).lower() for s in selected_by):
+                    preference_match = 100  # Lecturer explicitly selected this course
+        
+        # Calculate weighted probability
+        # 50% = preference match, 30% = match quality, 20% = preference score
+        probability = (preference_match * 0.5) + (quality_score * 0.3) + (pref_score * 0.2)
+        
+        # Ensure between 0-100
+        return max(0, min(100, int(probability)))
+    except Exception as e:
+        # Fallback to preference score
+        return int(slot.get('preference_score', 50))
+
+# ------------------------------
+# EVALUATE SCHEDULE WITH PREFERENCES
+# ------------------------------
 
 def evaluate_schedule(individual):
-    """
-    ╔══════════════════════════════════════════════════════════════════════════╗
-    ║  FITNESS FUNCTION UNTUK GENETIC ALGORITHM                                ║
-    ╚══════════════════════════════════════════════════════════════════════════╝
-    
-    Fungsi ini mengevaluasi kualitas sebuah individual (kromosom) dalam populasi
-    Genetic Algorithm. Individual merepresentasikan assignment dosen ke slot jadwal.
-    
-    ┌─────────────────────────────────────────────────────────────────────────┐
-    │ TUJUAN: MINIMIZE conflicts (Lower fitness = Better solution)             │
-    └─────────────────────────────────────────────────────────────────────────┘
-    
-    ═══════════════════════════════════════════════════════════════════════════
-    INDIVIDUAL REPRESENTATION:
-    ═══════════════════════════════════════════════════════════════════════════
-    Individual adalah list of lecturer names, dimana:
-    - Length = jumlah slots dalam master_schedule
-    - individual[i] = nama dosen yang assigned ke slot i
-    - Jika individual[i] = None, slot i tidak di-assign
-    
-    Example:
-        master_schedule = [
-            {"day": "Senin", "start": "08:00", "course": "Algoritma", ...},
-            {"day": "Senin", "start": "10:00", "course": "Basis Data", ...},
-            ...
-        ]
-        individual = ["Dr. Andi", "Dr. Budi", None, "Dr. Andi", ...]
-        
-    ═══════════════════════════════════════════════════════════════════════════
-    PENALTY/CONFLICT CALCULATION:
-    ═══════════════════════════════════════════════════════════════════════════
-    
-    1. HARD CONSTRAINTS (High Penalty):
-       ┌──────────────────────────────────────────────────────────────────────┐
-       │ • Lecturer Time Conflict: +10 points                                 │
-       │   → Dosen yang sama mengajar di waktu yang sama (different courses)  │
-       │                                                                       │
-       │ • Course Duplication: +20 points                                     │
-       │   → Mata kuliah yang sama di-assign lebih dari sekali                │
-       │                                                                       │
-       │ • Room Conflict: +15 points                                          │
-       │   → Ruangan yang sama dipakai di waktu yang sama                     │
-       └──────────────────────────────────────────────────────────────────────┘
-    
-    2. SOFT CONSTRAINTS (Preference Violations):
-       ┌──────────────────────────────────────────────────────────────────────┐
-       │ • Day Preference Violation: +5 points                                │
-       │   → Dosen dijadwalkan di hari yang tidak disukai                     │
-       │                                                                       │
-       │ • Time Preference Violation: +3 points                               │
-       │   → Dosen dijadwalkan di waktu yang tidak disukai                    │
-       │                                                                       │
-       │ • Workload Exceeded: +10 points                                      │
-       │   → Beban dosen (total SKS) melebihi max_load preference             │
-       │                                                                       │
-       │ • Too Many Courses: +5 points                                        │
-       │   → Dosen mengajar lebih dari 2 mata kuliah berbeda                  │
-       │                                                                       │
-       │ • Too Many Days: +2 points                                           │
-       │   → Dosen mengajar lebih dari 3 hari dalam seminggu                  │
-       └──────────────────────────────────────────────────────────────────────┘
-    
-    ═══════════════════════════════════════════════════════════════════════════
-    DATA STRUCTURES USED:
-    ═══════════════════════════════════════════════════════════════════════════
-    • lecturer_assigned: {(day, start, end): lecturer_name}
-      → Track siapa mengajar di waktu tertentu (detect time conflicts)
-      
-    • course_assigned: set of course_ids
-      → Track course yang sudah di-assign (detect duplicates)
-      
-    • room_assigned: {(day, room, start, end): True}
-      → Track ruangan yang sudah dipakai (detect room conflicts)
-      
-    • lecturer_load: {lecturer: total_sks}
-      → Track beban kerja total per dosen
-      
-    • lecturer_days: {lecturer: set of days}
-      → Track hari mengajar per dosen
-      
-    • lecturer_courses: {lecturer: list of course_ids}
-      → Track mata kuliah yang diampu per dosen
-    
-    ═══════════════════════════════════════════════════════════════════════════
-    Args:
-        individual (list): List of lecturer assignments untuk setiap slot
-        
-    Returns:
-        tuple: (conflicts,) - Total penalty/conflict score
-               Lower score = Better solution
-               Score 0 = Perfect solution (no conflicts)
-               
-    Example:
-        >>> individual = ["Dr. A", "Dr. B", None, "Dr. A", "Dr. C"]
-        >>> fitness = evaluate_schedule(individual)
-        >>> print(fitness)
-        (25,)  # Total conflicts = 25
-    
-    ═══════════════════════════════════════════════════════════════════════════
-    USAGE IN GA:
-    ═══════════════════════════════════════════════════════════════════════════
-    Fungsi ini digunakan oleh DEAP GA untuk:
-    1. Evaluasi setiap individual dalam populasi
-    2. Selection: Pilih individual dengan fitness terbaik (terendah)
-    3. Termination: Stop jika ditemukan solution dengan conflicts = 0
-    """
     conflicts = 0
-    
-    # Initialize tracking data structures
     lecturer_assigned = {}  # (day, start, end) -> lecturer
     course_assigned = set()  # set of course_ids to check uniqueness
     room_assigned = {}  # (day, room, start, end) -> True
@@ -1375,12 +614,11 @@ def evaluate_schedule(individual):
     lecturer_days = {}  # lecturer -> set of days
     lecturer_courses = {}  # lecturer -> list of courses
 
-    # Get all lecturer preferences dari database
+    # Get all lecturer preferences
     lecturer_preferences = {}
     for user in users_collection.find({"role": "dosen"}):
         lecturer_preferences[user["name"]] = user.get("preferences", {})
 
-    # Iterate through each assignment dalam individual
     for idx, lecturer in enumerate(individual):
         slot = master_schedule[idx]
         day = slot["day"]
@@ -1393,26 +631,20 @@ def evaluate_schedule(individual):
         key_room = (day, room, start, end)
 
         if lecturer:
-            # ═══════════════════════════════════════════════════════════════
-            # CHECK 1: Lecturer Time Conflict
-            # ═══════════════════════════════════════════════════════════════
+            # Lecturer conflict: same lecturer at same time
             if key_time in lecturer_assigned:
                 if lecturer_assigned[key_time] == lecturer:
                     conflicts += 10  # High penalty for time conflict
             lecturer_assigned[key_time] = lecturer
 
-            # ═══════════════════════════════════════════════════════════════
-            # TRACK: Lecturer workload and teaching patterns
-            # ═══════════════════════════════════════════════════════════════
+            # Track lecturer load
             lecturer_load[lecturer] = lecturer_load.get(lecturer, 0) + sks
             lecturer_days[lecturer] = lecturer_days.get(lecturer, set())
             lecturer_days[lecturer].add(day)
             lecturer_courses[lecturer] = lecturer_courses.get(lecturer, [])
             lecturer_courses[lecturer].append(course_id)
 
-            # ═══════════════════════════════════════════════════════════════
-            # CHECK 2-6: Preference-based soft constraints
-            # ═══════════════════════════════════════════════════════════════
+            # Check preferences
             prefs = lecturer_preferences.get(lecturer, {})
             available_days = prefs.get("available_days", [])
             preferred_times = prefs.get("preferred_times", {})
@@ -1460,46 +692,14 @@ def evaluate_schedule(individual):
 
 def check_schedule_conflicts(schedule=None):
     """
-    ═══════════════════════════════════════════════════════════════════════════
-    FUNGSI DETEKSI KONFLIK DALAM JADWAL
-    ═══════════════════════════════════════════════════════════════════════════
-    
-    Fungsi ini memeriksa jadwal untuk mendeteksi dua jenis konflik utama:
-    1. LECTURER CONFLICT: Dosen mengajar di 2 kelas pada waktu yang sama
-    2. ROOM CONFLICT: Ruangan dipakai oleh 2 kelas pada waktu yang sama
-    
-    Algoritma:
-    ┌────────────────────────────────────────────────────────────────────────┐
-    │ 1. Iterate melalui semua slot dalam schedule                           │
-    │ 2. Track assignment dengan key (lecturer, day, start, end)             │
-    │ 3. Track room usage dengan key (day, room, start, end)                 │
-    │ 4. Jika key sudah ada = CONFLICT detected                              │
-    │ 5. Print detail conflict dan mark conflicts_found = True               │
-    └────────────────────────────────────────────────────────────────────────┘
-    
-    Args:
-        schedule (list, optional): List of schedule documents.
-                                    Jika None, akan load dari database.
-    
-    Returns:
-        bool: True jika ditemukan konflik, False jika tidak ada konflik
-    
-    Example:
-        >>> schedule = load_schedule()
-        >>> has_conflict = check_schedule_conflicts(schedule)
-        >>> if has_conflict:
-        >>>     print("Ada konflik! Perlu diperbaiki")
-        
-    Output jika ada conflict:
-        Conflict: Lecturer Dr. Andi has overlapping slots on Senin 08:00-09:40 for Algoritma
-        Conflict: Room Infor 1 is double-booked on Selasa 10:00-11:40 for Basis Data
+    Check for conflicts in current schedule.
+    Returns True if conflicts are found, False otherwise.
     """
     if schedule is None:
         schedule = load_schedule()
     
     conflicts_found = False
 
-    # Data structures untuk tracking assignments
     lecturer_time = {}  # (lecturer, day, start, end) -> True
     room_time = {}  # (day, room, start, end) -> True
 
@@ -1511,19 +711,17 @@ def check_schedule_conflicts(schedule=None):
         room = slot.get('room')
         course_name = slot.get('course_name', 'Unknown')
 
-        # Check lecturer conflict
         if lecturer:
             key_lect = (lecturer, day, start, end)
             if key_lect in lecturer_time:
-                print(f"[CONFLICT] Lecturer {lecturer} has overlapping slots on {day} {start}-{end} for {course_name}")
+                print(f"Conflict: Lecturer {lecturer} has overlapping slots on {day} {start}-{end} for {course_name}")
                 conflicts_found = True
             lecturer_time[key_lect] = True
 
-        # Check room conflict
         if room:
             key_room = (day, room, start, end)
             if key_room in room_time:
-                print(f"[CONFLICT] Room {room} is double-booked on {day} {start}-{end} for {course_name}")
+                print(f"Conflict: Room {room} is double-booked on {day} {start}-{end} for {course_name}")
                 conflicts_found = True
             room_time[key_room] = True
 
@@ -1593,90 +791,35 @@ TIMEBLOCKS_1SKS = [
     "16:30-17:20",
 ]
 
-# ==============================================================================
-# FUNGSI GET TIMESLOTS BY DAY
-# ==============================================================================
-
+# ===================
+#  FUNGSI AMBIL TIMESLOT PER HARI
+# ===================
 def get_timeslots_by_day(day):
     """
-    Mendapatkan daftar timeslot yang valid berdasarkan hari.
-    
-    Hari Jumat memiliki timeslot yang berbeda karena:
-    - Istirahat sholat Jumat (11:20-14:00)
-    - Pengurangan beban perkuliahan di hari Jumat
-    
-    Timeslots Senin-Kamis:
-    ├─ 08:00-08:50, 08:50-09:40, 09:40-10:30, 10:30-11:20, 11:20-12:10, 12:10-13:00
-    ├─ Istirahat: 13:00-13:10 (khusus 1 SKS)
-    └─ 14:00-14:50, 14:50-15:40, 15:40-16:30
-    
-    Timeslots Jumat:
-    ├─ 08:00-08:50, 08:50-09:40, 09:40-10:30, 10:30-11:20
-    ├─ Istirahat Jumat: 11:20-14:00 (tidak ada timeslot)
-    └─ 14:00-14:50, 14:50-15:40, 15:40-16:30
-    
-    Args:
-        day (str): Nama hari ('Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat')
-        
-    Returns:
-        list: List of timeslot strings (format "HH:MM-HH:MM")
-        
-    Example:
-        >>> get_timeslots_by_day('Senin')
-        ['08:00-08:50', '08:50-09:40', ..., '15:40-16:30']
-        
-        >>> get_timeslots_by_day('Jumat')
-        ['08:00-08:50', '08:50-09:40', '09:40-10:30', '10:30-11:20',
-         '14:00-14:50', '14:50-15:40', '15:40-16:30']
+    Mengembalikan daftar timeslot valid berdasarkan hari.
+    Senin–Kamis: gunakan TIMESLOTS_SENIN_KAMIS
+    Jumat: gunakan TIMESLOTS_JUMAT
     """
     if day == "Jumat":
         return TIMESLOTS_JUMAT
     else:
         return TIMESLOTS_SENIN_KAMIS
 
-# ==============================================================================
-# FUNGSI VALIDASI LECTURER ASSIGNMENTS
-# ==============================================================================
-
+# ===================
+#  VALIDASI LECTURER ASSIGNMENTS (BARU)
+# ===================
 def validate_lecturer_assignments():
-    """
-    Validasi assignment dosen dalam jadwal yang sudah dibuat.
-    
-    Fungsi ini melakukan soft validation (RELAXED rules) untuk memastikan:
-    - Dosen tidak mengajar terlalu banyak hari dalam seminggu
-    
-    Aturan yang diterapkan:
-    ┌────────────────────────────────────────────────────────────────────────┐
-    │ ✓ Maksimal 3 hari mengajar per minggu (untuk keseimbangan beban)      │
-    │ ✗ TIDAK enforce jumlah section per mata kuliah (flexible)              │
-    │ ✗ TIDAK enforce jumlah mata kuliah per dosen (flexible)                │
-    └────────────────────────────────────────────────────────────────────────┘
-    
-    Kenapa RELAXED?
-    - Memberikan fleksibilitas dalam scheduling
-    - Prioritas: No conflicts > Load balancing > Strict rules
-    - Real-world constraints sering memerlukan fleksibilitas
-    
-    Returns:
-        list: List of violation strings. Empty list jika tidak ada violation.
-              Format: "[Nama Dosen]: Mengajar X hari (maksimal 3 hari)"
-    
-    Example:
-        >>> violations = validate_lecturer_assignments()
-        >>> if violations:
-        >>>     for v in violations:
-        >>>         print(f"WARNING: {v}")
-        >>> else:
-        >>>     print("Semua assignment valid!")
-        
-        Output jika ada violation:
-        WARNING: Dr. Andi: Mengajar 4 hari (maksimal 3 hari)
-        WARNING: Dr. Budi: Mengajar 5 hari (maksimal 3 hari)
+    """Validasi assignment dosen.
+
+    Aturan yang diterapkan (RELAXED):
+    - Tidak lagi enforce jumlah section per mata kuliah
+    - Tidak lagi enforce jumlah mata kuliah per dosen
+    - Hanya cek: maksimal 3 hari mengajar
     """
     schedule = load_schedule()
     lecturer_days = {}
 
-    # Hitung hari mengajar dari schedule untuk setiap dosen
+    # Hitung hari mengajar dari schedule
     for slot in schedule:
         lecturer = slot.get('dosen')
         day = slot.get('day')
@@ -1687,160 +830,20 @@ def validate_lecturer_assignments():
 
     violations = []
     for lecturer, days in lecturer_days.items():
-        # Cek aturan: maksimal 3 hari mengajar
+        # Cek aturan hari: maksimal 3 hari
         if len(days) > 3:
-            violations.append(
-                f"{lecturer}: Mengajar {len(days)} hari (maksimal 3 hari)"
-            )
+            violations.append(f"{lecturer}: Mengajar {len(days)} hari (maksimal 3 hari)")
 
     return violations
 
-# ==============================================================================
-# OR-TOOLS CP-SAT OPTIMIZATION UNTUK PENJADWALAN
-# ==============================================================================
-# Fungsi ini adalah CORE dari skripsi: menggunakan Google OR-Tools CP-SAT Solver
-# untuk menyelesaikan Constraint Satisfaction Problem (CSP) dalam penjadwalan
-
+# ===================
+#  OR-TOOLS OPTIMIZATION
+# ===================
 def ortools_optimize_schedule():
     """
-    ╔══════════════════════════════════════════════════════════════════════════╗
-    ║  FUNGSI UTAMA: OR-TOOLS CP-SAT SOLVER UNTUK PENJADWALAN PERKULIAHAN     ║
-    ╚══════════════════════════════════════════════════════════════════════════╝
-    
-    Fungsi ini mengimplementasikan Constraint Programming menggunakan Google
-    OR-Tools CP-SAT Solver untuk menghasilkan jadwal perkuliahan yang optimal.
-    
-    ┌─────────────────────────────────────────────────────────────────────────┐
-    │ ALGORITMA: Constraint Programming (CP)                                   │
-    │ SOLVER: Google OR-Tools CP-SAT                                           │
-    │ PROBLEM TYPE: Constraint Satisfaction Problem (CSP)                      │
-    └─────────────────────────────────────────────────────────────────────────┘
-    
-    ═══════════════════════════════════════════════════════════════════════════
-    PIPELINE / LANGKAH KERJA:
-    ═══════════════════════════════════════════════════════════════════════════
-    
-    1. LOAD DATA
-       ├── Ambil semua mata kuliah dari database (courses collection)
-       ├── Ambil semua dosen dari database (users collection, role='dosen')
-       └── Normalisasi nama dosen (fuzzy matching untuk konsistensi)
-    
-    2. CREATE CP-SAT MODEL
-       └── model = cp_model.CpModel()
-    
-    3. DEFINE BOOLEAN VARIABLES
-       ├── Untuk setiap kombinasi:
-       │   ├── Dosen (lecturer)
-       │   ├── Mata Kuliah (course)
-       │   ├── Section (1, 2, ...)
-       │   ├── Hari (Senin, Selasa, ..., Jumat)
-       │   ├── Ruangan (Infor 1-5, Jawa 8A/8B, Lab 1-4)
-       │   └── Waktu mulai (08:00, 08:10, ..., 16:30)
-       │
-       └── Buat Boolean variable:
-           assign[lecturer][course][section][day][room][time] = BoolVar
-           
-           Arti: Variable ini = 1 (True) jika:
-                 - Dosen 'lecturer' mengajar
-                 - Mata kuliah 'course'
-                 - Section 'section'
-                 - Pada hari 'day'
-                 - Di ruangan 'room'
-                 - Dimulai jam 'time'
-    
-    4. ADD HARD CONSTRAINTS (Wajib dipenuhi)
-       ├── a. Each section must be assigned exactly once
-       │      ∑(assign[l][c][s][d][r][t]) = 1  ∀ section s
-       │      → Setiap section HARUS dijadwalkan tepat 1 kali
-       │
-       ├── b. Each lecturer teaches exactly 2 courses
-       │      ∑(course_taught[l]) = 2  ∀ lecturer l
-       │      → Setiap dosen mengajar TEPAT 2 mata kuliah
-       │
-       ├── c. Each lecturer teaches exactly 2 sections per course
-       │      ∑(assign[l][c][s][d][r][t]) = 2  ∀ lecturer l, course c
-       │      → Setiap dosen mengajar 2 section dari MK yang sama
-       │
-       ├── d. No lecturer conflicts (same time, different courses)
-       │      ∑(assign[l][*][*][d][*][t]) ≤ 1  ∀ lecturer l, day d, time t
-       │      → Dosen tidak boleh mengajar 2 kelas di waktu yang sama
-       │
-       ├── e. No room conflicts (same room, same time)
-       │      ∑(assign[*][*][*][d][r][t]) ≤ 1  ∀ day d, room r, time t
-       │      → Ruangan tidak boleh dipakai 2 kelas di waktu yang sama
-       │
-       ├── f. Same course sections on same day
-       │      day[c][s1] = day[c][s2]  ∀ course c, sections s1,s2
-       │      → Section 1 dan Section 2 dari MK yang sama di hari yang sama
-       │
-       ├── g. Room type matching
-       │      - Praktikum (is_lab=True) → Lab Rooms only
-       │      - Teori (is_lab=False) → Non-Lab Rooms only
-       │
-       └── h. Lecturer teaches only selected courses
-           → Dosen hanya bisa mengajar MK yang ada di selected_by
-    
-    5. ADD SOFT CONSTRAINTS (Optimization objectives)
-       ├── Prefer lecturer's preferred days/times
-       ├── Balance workload across days
-       ├── Minimize consecutive classes
-       └── Distribute evenly across the week
-    
-    6. SOLVE WITH CP-SAT SOLVER
-       ├── solver = cp_model.CpSolver()
-       ├── status = solver.Solve(model)
-       └── Timeout: 60 seconds (configurable)
-    
-    7. EXTRACT SOLUTION & SAVE TO DATABASE
-       ├── Iterate through all variables
-       ├── If assign[...] = 1 (True), extract assignment details
-       └── Save to schedules collection
-    
-    ═══════════════════════════════════════════════════════════════════════════
-    INPUT:
-    ═══════════════════════════════════════════════════════════════════════════
-    - courses_collection: MongoDB collection berisi mata kuliah
-      Fields: course_name, sks, semester, is_lab, selected_by[]
-    
-    - users_collection: MongoDB collection berisi dosen
-      Fields: name, email, role='dosen', preferences{}
-    
-    ═══════════════════════════════════════════════════════════════════════════
-    OUTPUT:
-    ═══════════════════════════════════════════════════════════════════════════
-    - schedules_collection: MongoDB collection berisi jadwal final
-      Fields: dosen, mata_kuliah, section, hari, waktu, ruangan, sks, is_lab
-    
-    ═══════════════════════════════════════════════════════════════════════════
-    RETURN VALUE:
-    ═══════════════════════════════════════════════════════════════════════════
-    - True: Jika scheduling berhasil dan ada solusi optimal/feasible
-    - False: Jika gagal atau tidak ada solusi
-    
-    ═══════════════════════════════════════════════════════════════════════════
-    CONTOH PENGGUNAAN:
-    ═══════════════════════════════════════════════════════════════════════════
-    >>> success = ortools_optimize_schedule()
-    >>> if success:
-    >>>     print("Penjadwalan berhasil dengan OR-Tools CP-SAT!")
-    >>> else:
-    >>>     print("Tidak ditemukan solusi yang memenuhi semua constraint")
-    
-    ═══════════════════════════════════════════════════════════════════════════
-    COMPLEXITY ANALYSIS:
-    ═══════════════════════════════════════════════════════════════════════════
-    Variables: O(L × C × S × D × R × T)
-    - L = Jumlah lecturers (~10-20)
-    - C = Jumlah courses (~30-50)
-    - S = Sections per course (2)
-    - D = Days (5)
-    - R = Rooms (11)
-    - T = Time slots per day (~8-10)
-    
-    Total variables: ~50,000 - 200,000 Boolean variables
-    Constraints: ~10,000 - 50,000 constraints
-    
-    Solve time: Typically 5-60 seconds (depends on problem complexity)
+    Optimasi jadwal menggunakan OR-Tools Constraint Programming.
+    - Menangani semua batasan keras secara eksak
+    - Menghasilkan solusi optimal atau feasible
     """
     logger = app.logger
     
@@ -3476,10 +2479,6 @@ def koordinator_courses():
         except Exception:
             pass
 
-        # Count sections for this course
-        section_count = sections_collection.count_documents({"course_id": str(c["_id"])})
-        c['section_count'] = section_count
-
     courses_by_semester = group_courses_by_semester(courses)
     return render_template(
         "koordinator_courses.html",
@@ -3698,6 +2697,9 @@ def schedule():
         else:
             # Default ke teori jika tidak ditemukan atau course_name kosong
             slot['capacity'] = MAX_CLASS_SIZE_NON_LAB
+        
+        # Tambahkan probabilitas/confidence untuk setiap slot
+        slot['probability'] = calculate_schedule_probability(slot, courses, dosen_list)
 
     schedule_by_day = group_slots_by_day(schedule)
     return render_template(
@@ -3770,14 +2772,7 @@ def koordinator():
     # Ambil data section yang dihapus
     removed_sections_log = []
     try:
-        all_removed = list(removed_sections_collection.find().sort('removed_at', -1))
-        # Deduplikasi berdasarkan course_name + section_label untuk menghindari tampilan berulang
-        seen = set()
-        for log in all_removed:
-            key = (log.get('course_name', ''), log.get('section_label', ''))
-            if key not in seen:
-                seen.add(key)
-                removed_sections_log.append(log)
+        removed_sections_log = list(removed_sections_collection.find().sort('removed_at', -1))
     except Exception:
         removed_sections_log = []
     
@@ -5722,26 +4717,7 @@ def dosen_select_course():
             pass
 
     courses_by_semester = group_courses_by_semester(courses)
-
-    # Hitung jumlah kelas (section) yang sudah dimiliki dosen ini
-    max_sections_cap = 4
-    current_sections_count = 0
-    try:
-        if sections_collection is not None:
-            current_sections_count = sections_collection.count_documents({
-                "$or": [{"dosen": username}, {"lecturer": username}]
-            })
-    except Exception:
-        current_sections_count = 0
-
-    return render_template(
-        "dosen_select_course.html",
-        courses=courses,
-        courses_by_semester=courses_by_semester,
-        username=username,
-        current_sections_count=current_sections_count,
-        max_sections_cap=max_sections_cap,
-    )
+    return render_template("dosen_select_course.html", courses=courses, courses_by_semester=courses_by_semester, username=username)
 
 @app.route("/dosen/select_slot")
 def dosen_select_slot():
@@ -7150,9 +6126,8 @@ def generate_sections_simple_pipeline(semester_type='semua'):
                 'section_letter': section_letter,
                 'section_number': section_number,
                 'section_label': f"{section_letter}{section_number}",
-                'lecturer': 'Unassigned',      # Dosen belum assign
-                'dosen': 'Unassigned',          # Backup field
-                'lecturer_name': None           # FIX: Tambah lecturer_name field (akan diisi saat assignment)
+                'lecturer': 'Unassigned',  # Dosen belum assign
+                'dosen': 'Unassigned'       # Backup field
             })
     
     # Simpan sections ke database
@@ -7174,6 +6149,9 @@ def generate_sections_ga_pipeline(population=150, generations=300, force_regener
     - Menghormati preferred lecturer (selected_by) bila tersedia
     - semester_type: 'semua' (default), 'ganjil', atau 'genap'
     """
+    # ⏱️ START TIMING - GA Section Generation
+    ga_start_time = time.time()
+    
     if sections_collection is None:
         flash("Sections collection not available.")
         return
@@ -7356,26 +6334,23 @@ def _continue_generate_sections_pipeline(courses, lecturers, lecturer_names, stu
     print(f"{'='*80}\n")
     
     lecturer_selected_courses = {name: [] for name in lecturer_names}
-    lecturer_selected_course_ids = {name: [] for name in lecturer_names}
     for c in courses:
         for lect_name in c.get('selected_by', []):
             if lect_name in lecturer_selected_courses:
                 lecturer_selected_courses[lect_name].append(c['course_name'])
-                lecturer_selected_course_ids[lect_name].append(str(c['_id']))
     
     only_one_course_lecturers = []
     for name, course_list in sorted(lecturer_selected_courses.items()):
         if len(course_list) > 0:
             if len(course_list) == 1:
                 only_one_course_lecturers.append((name, course_list[0]))
-                print(f"  [!] {name}: Hanya memilih 1 MK: {course_list[0]} → akan dapat 4 section")
+                print(f"  [!] {name}: Hanya memilih 1 MK: {course_list[0]}")
             elif len(course_list) == 2:
-                print(f"  [OK] {name}: Memilih 2 MK: {', '.join(course_list)} → masing-masing 2 section")
-            else:
-                print(f"  [i] {name}: Memilih {len(course_list)} MK: {', '.join(course_list)}")
+                print(f"  [OK] {name}: Memilih 2 MK: {', '.join(course_list)}")
     
     if only_one_course_lecturers:
-        print(f"\n[!] INFO: {len(only_one_course_lecturers)} dosen hanya memilih 1 mata kuliah, akan mendapat 4 section untuk MK tersebut.")
+        print(f"\n[!] WARNING: {len(only_one_course_lecturers)} dosen hanya memilih 1 mata kuliah!")
+        print(f"   Constraint '2 mata kuliah per dosen' TIDAK dapat dipenuhi untuk mereka.")
     
     print(f"\n{'='*80}")
     print(f"MEMBUAT SECTION SESUAI ATURAN (BALANCED SKS)")
@@ -7408,154 +6383,75 @@ def _continue_generate_sections_pipeline(courses, lecturers, lecturer_names, stu
             print(f"[!] {course_name}: Tidak ada dosen yang memilih, skip.")
             continue
         
-        # NEW DISTRIBUTION LOGIC: Berdasarkan jumlah MK yang diambil dosen
-        # 1. Jika dosen ambil 2 MK → 2 section per MK
-        # 2. Jika dosen ambil 1 MK → 4 section untuk MK tersebut
-        # 3. Jika MK diambil oleh multiple dosen → bagi secara fair
-        
+        # DYNAMIC DISTRIBUTION: Hitung section berdasarkan SKS dosen saat ini
+        # Target: setiap dosen 8-12 SKS total
         distribution = []
         for lecturer in selected:
-            # Hitung berapa MK yang diambil dosen ini
-            num_courses_taken = len(lecturer_selected_course_ids.get(lecturer, []))
+            current_sks = lecturer_sks.get(lecturer, 0)
+            remaining_capacity = MAX_SKS_PER_DOSEN - current_sks
             
-            if num_courses_taken == 0:
+            # Jika dosen sudah mencapai/melebihi max, skip
+            if remaining_capacity <= 0:
                 distribution.append(0)
                 continue
-            elif num_courses_taken == 1:
-                # Dosen hanya ambil 1 MK → dapat 4 section untuk MK ini
-                target_sections = 4
-            elif num_courses_taken == 2:
-                # Dosen ambil 2 MK → dapat 2 section per MK
-                target_sections = 2
+            
+            # Hitung maksimal section yang bisa diterima dosen ini untuk MK ini
+            max_sections_possible = remaining_capacity // sks if sks > 0 else 0
+            
+            # Tentukan target section berdasarkan:
+            # 1. Kapasitas sisa dosen
+            # 2. Kebutuhan section untuk mata kuliah ini (required_sections / num_lecturers)
+            # 3. Minimum 1 section jika masih ada kapasitas
+            if max_sections_possible >= 3:
+                sections_for_this_lecturer = 3  # Ideal
+            elif max_sections_possible >= 2:
+                sections_for_this_lecturer = 2  # Acceptable
+            elif max_sections_possible >= 1:
+                sections_for_this_lecturer = 1  # Minimal
             else:
-                # Dosen ambil >2 MK → bagi merata sesuai kapasitas
-                # Target SKS 12, misal 3 SKS per MK → 12/3 = 4 section total → 4/num_courses
-                total_target_sections = 12 // sks if sks > 0 else 4
-                target_sections = max(1, total_target_sections // num_courses_taken)
+                sections_for_this_lecturer = 0  # No capacity
             
-            distribution.append(target_sections)
-        
-        # Jika ada multiple dosen di MK yang sama, sesuaikan distribusi
-        if num_lecturers > 1:
-            # Jika MK diambil multiple dosen, bagi fair
-            total_dist = sum(distribution)
-            
-            # Jika total distribution > required_sections, kurangi proporsional
-            if total_dist > required_sections:
-                # Scale down proporsional
-                scale_factor = required_sections / total_dist
-                distribution = [max(1, int(d * scale_factor)) for d in distribution]
-                
-                # Adjust sisa jika masih lebih
-                while sum(distribution) > required_sections and max(distribution) > 1:
-                    max_idx = distribution.index(max(distribution))
-                    distribution[max_idx] -= 1
-            
-            # Jika dosen A ambil 1 MK dan dosen B juga ambil MK yang sama
-            # Cek apakah ada dosen dengan 1 MK di list selected
-            single_course_lecturers_in_this_mk = []
-            two_course_lecturers_in_this_mk = []
-            
-            for idx, lecturer in enumerate(selected):
-                num_courses_taken = len(lecturer_selected_course_ids.get(lecturer, []))
-                if num_courses_taken == 1:
-                    single_course_lecturers_in_this_mk.append(idx)
-                elif num_courses_taken == 2:
-                    two_course_lecturers_in_this_mk.append(idx)
-            
-            # Jika ada dosen dengan 1 MK dan dosen dengan 2 MK
-            if single_course_lecturers_in_this_mk and two_course_lecturers_in_this_mk:
-                # Bagi fair: masing-masing dapat 2 section
-                for idx in single_course_lecturers_in_this_mk + two_course_lecturers_in_this_mk:
-                    distribution[idx] = 2
-                
-                # Hitung sisa section
-                total_assigned = sum(distribution)
-                if total_assigned < required_sections:
-                    # Ada sisa, hapus
-                    print(f"  [i] {course_name}: Sisa {required_sections - total_assigned} section akan dihapus (tidak dijadwalkan)")
-                    required_sections = total_assigned
-                elif total_assigned > required_sections:
-                    # Over-allocation, kurangi dari yang terbesar
-                    while sum(distribution) > required_sections and max(distribution) > 0:
-                        max_idx = distribution.index(max(distribution))
-                        distribution[max_idx] -= 1
+            distribution.append(sections_for_this_lecturer)
 
-
-        # Sesuaikan distribusi agar tidak melebihi/kurang dari kebutuhan mahasiswa aktif
-        # Namun prioritaskan logika berdasarkan jumlah MK yang diambil
+        # Sesuaikan distribusi agar tidak melebihi/kurang dari kebutuhan section berbasis jumlah mahasiswa aktif
         if distribution:
             current_total = sum(distribution)
-            
-            # Jika current_total < required_sections, tambah hanya jika memang perlu
             if current_total < required_sections:
-                # Tambah section secara round-robin, tapi batasi berdasarkan jumlah MK
+                # tambah section secara round-robin hingga memenuhi kebutuhan
                 idx = 0
-                added = 0
-                max_additions = required_sections - current_total
-                
-                while added < max_additions and idx < len(selected) * 10:  # Limit iterations
-                    lect_idx = idx % len(selected)
-                    lecturer = selected[lect_idx]
-                    num_courses_taken = len(lecturer_selected_course_ids.get(lecturer, []))
-                    
-                    # Batasan: 1 MK max 4, 2 MK max 2 per MK
-                    if num_courses_taken == 1 and distribution[lect_idx] < 4:
-                        distribution[lect_idx] += 1
-                        added += 1
-                    elif num_courses_taken == 2 and distribution[lect_idx] < 2:
-                        distribution[lect_idx] += 1
-                        added += 1
-                    
+                while current_total < required_sections:
+                    distribution[idx % len(distribution)] += 1
+                    current_total += 1
                     idx += 1
-                
-                # Jika masih kurang, berarti harus hapus sisa section
-                if sum(distribution) < required_sections:
-                    print(f"  [i] {course_name}: Kebutuhan {required_sections} section tidak dapat dipenuhi, hanya {sum(distribution)} section yang akan dijadwalkan. Sisa {required_sections - sum(distribution)} section dihapus.")
-                    required_sections = sum(distribution)
-            
             elif current_total > required_sections:
-                # Kurangi dari dosen dengan beban terbesar
+                # kurangi dari dosen dengan beban terbesar terlebih dahulu
                 while current_total > required_sections and max(distribution) > 0:
                     max_idx = distribution.index(max(distribution))
                     distribution[max_idx] -= 1
                     current_total -= 1
 
-
-        # Info distribusi dengan detail per dosen
+        # Info distribusi
         total_sections = sum(distribution)
         total_sks_course = total_sections * sks
         dist_str = '+'.join(map(str, distribution)) if distribution else '0'
+        print(f"  [i] {course_name} ({sks} SKS, sem {course.get('semester', '-')}, need {required_sections}): {num_lecturers} dosen -> {dist_str} section (total {total_sections} section, {total_sks_course} SKS)")
         
-        # Detail per dosen
-        lecturer_details = []
-        for lect_idx, lecturer in enumerate(selected):
-            num_courses = len(lecturer_selected_course_ids.get(lecturer, []))
-            sections_for_this = distribution[lect_idx]
-            lecturer_details.append(f"{lecturer}({num_courses}MK:{sections_for_this}sec)")
-        
-        detail_str = ', '.join(lecturer_details)
-        print(f"  [i] {course_name} ({sks} SKS, sem {course.get('semester', '-')})")
-        print(f"      Kebutuhan mahasiswa: {required_sections} section")
-        print(f"      Distribusi: {dist_str} = {total_sections} section ({total_sks_course} SKS)")
-        print(f"      Detail: {detail_str}")
-        
-        if total_sections < required_sections:
-            deleted = required_sections - total_sections
-            print(f"      ❌ HAPUS {deleted} section (kelebihan dari kebutuhan dosen)")
-
-        
-        # Buat section untuk setiap dosen sesuai distribusi yang dihitung
+        # Buat section untuk setiap dosen DENGAN tracking SKS real-time
         section_idx = 0
         for lect_idx, lecturer in enumerate(selected):
             num_sections = distribution[lect_idx]
-            # Stop jika total section yang akan dibuat sudah mencapai target
-            if section_idx >= total_sections:
+            # Stop jika kebutuhan section sudah terpenuhi
+            if section_idx >= required_sections:
                 break
             
             sections_assigned_to_lecturer = 0
             for i in range(num_sections):
-                if section_idx >= total_sections:
+                if section_idx >= required_sections:
+                    break
+                
+                # Check SKS limit sebelum assign
+                if lecturer_sks[lecturer] + sks > MAX_SKS_PER_DOSEN:
+                    print(f"  [SKIP] {lecturer} sudah mencapai batas SKS ({lecturer_sks[lecturer]} + {sks} > {MAX_SKS_PER_DOSEN})")
                     break
                 
                 section_number = section_idx + 1  # Sequential: 1, 2, 3, 4, 5, 6...
@@ -7575,13 +6471,14 @@ def _continue_generate_sections_pipeline(courses, lecturers, lecturer_names, stu
                 section_idx += 1
                 sections_assigned_to_lecturer += 1
                 lecturer_section_count[lecturer] += 1
-                lecturer_sks[lecturer] += sks  # Update SKS tracking
+                lecturer_sks[lecturer] += sks  # Update SKS real-time
             
             if sections_assigned_to_lecturer > 0:
                 lecturer_course_count[lecturer] += 1
         
-        print(f"      ✅ Created {section_idx} sections for {course_name}")
-
+        actual_assigned = sum(1 for s in new_sections if s['course_id'] == course_id and s['course_name'] == course_name)
+        dist_str = '+'.join(map(str, distribution)) if distribution else '0'
+        print(f"[OK] {course_name}: {num_lecturers} dosen -> distribusi {dist_str} section (actual: {actual_assigned}/{required_sections})")
     
     # Simpan section ke database
     if new_sections:
@@ -7592,65 +6489,41 @@ def _continue_generate_sections_pipeline(courses, lecturers, lecturer_names, stu
         sections_collection.insert_many(new_sections)
         print(f"\n[OK] Total {len(new_sections)} section berhasil dibuat dan disimpan ke database.")
     
+    # ⏱️ END TIMING - GA Section Generation
+    ga_end_time = time.time()
+    ga_elapsed = ga_end_time - ga_start_time
+    
     # Cetak ringkasan
     total_courses = len(courses)
     total_lecturers = len(set((s.get('dosen') or s.get('lecturer')) for s in new_sections))
     print(f"\n{'='*80}")
-    print(f"RINGKASAN DISTRIBUSI BERDASARKAN JUMLAH MK YANG DIAMBIL")
+    print(f"RINGKASAN DISTRIBUSI")
     print(f"{'='*80}")
-    print(f"LOGIKA DISTRIBUSI:")
-    print(f"  • Dosen ambil 2 MK → masing-masing dapat 2 section per MK (total 4 section)")
-    print(f"  • Dosen ambil 1 MK → dapat 4 section untuk MK tersebut")
-    print(f"  • MK diambil >1 dosen → bagi section secara fair")
-    print(f"  • Section berlebih (melebihi target) → DIHAPUS/tidak dijadwalkan")
-    print(f"")
     print(f"Total dosen: {total_lecturers}")
     print(f"Total mata kuliah: {total_courses}")
-    print(f"Total section dibuat: {len(new_sections)}")
+    print(f"Total section: {len(new_sections)}")
+    print(f"\n⏱️  GA COMPUTATION TIME: {ga_elapsed:.2f} seconds ({ga_elapsed/60:.2f} minutes)")
     
-    # Detail per dosen dengan jumlah MK
-    print(f"\n{'='*80}")
-    print(f"DETAIL DISTRIBUSI PER DOSEN")
-    print(f"{'='*80}")
-    for name in sorted(lecturer_names):
-        num_courses = len(lecturer_selected_course_ids.get(name, []))
-        if num_courses == 0:
-            continue
-        
-        sks_count = lecturer_sks.get(name, 0)
-        sections = lecturer_section_count.get(name, 0)
-        courses_list = lecturer_selected_courses.get(name, [])
-        
-        if sks_count < MIN_SKS_PER_DOSEN:
-            status = "⚠️  UNDER"
-        elif sks_count <= MAX_SKS_PER_DOSEN:
-            status = "✓ OK"
-        else:
-            status = "❌ OVER"
-        
-        print(f"{status} {name}:")
-        print(f"    Mengambil: {num_courses} MK ({', '.join(courses_list)})")
-        print(f"    Section: {sections} section")
-        print(f"    Total SKS: {sks_count} SKS")
-    
-    # Distribusi SKS summary
-    print(f"\n{'='*80}")
-    print(f"RINGKASAN SKS")
-    print(f"{'='*80}")
+    # Distribusi SKS per dosen
+    print(f"\nDistribusi SKS per dosen:")
     sks_groups = {"<8 SKS": 0, "8-12 SKS": 0, ">12 SKS": 0}
-    for name, sks_count in lecturer_sks.items():
+    for name, sks_count in sorted(lecturer_sks.items(), key=lambda x: x[1], reverse=True):
         if sks_count == 0:
             continue
         if sks_count < MIN_SKS_PER_DOSEN:
             sks_groups["<8 SKS"] += 1
+            status = "⚠️  UNDER"
         elif sks_count <= MAX_SKS_PER_DOSEN:
             sks_groups["8-12 SKS"] += 1
+            status = "✓ OK"
         else:
             sks_groups[">12 SKS"] += 1
+            status = "❌ OVER"
+        print(f"  {status} {name}: {sks_count} SKS, {lecturer_section_count[name]} section")
     
+    print(f"\nRingkasan:")
     for group, count in sks_groups.items():
         print(f"  {group}: {count} dosen")
-
     
     print(f"{'='*80}\n")
     
@@ -7668,6 +6541,9 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
     INCLUDES LECTURER PREFERENCES: available_days, preferred_times, unavailable_time_ranges.
     semester_type: 'semua' (default), 'ganjil', or 'genap'.
     """
+    # ⏱️ START TIMING - Greedy Scheduling Algorithm
+    scheduling_start_time = time.time()
+    
     import inspect
     logger.info(f"\n{'='*80}")
     logger.info(f"🔵 FUNCTION START: schedule_sections_with_ortools() called")
@@ -7690,20 +6566,140 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
     if not all_sections:
         flash("Tidak ada section untuk dijadwalkan. Jalankan GA terlebih dahulu.")
         return
-
-    # CRITICAL FIX: Reset lecturer_name to None for all sections BEFORE assignment
-    # This ensures we don't use stale lecturer_name values from previous runs
-    for sec in all_sections:
-        sec['lecturer_name'] = None
     
-    # Sync reset to MongoDB
-    for sec in all_sections:
-        sections_collection.update_one(
-            {"_id": sec["_id"]},
-            {"$set": {"lecturer_name": None}}
-        )
+    # [CAP] PEMBATASAN SECTION: Maksimal 4 kelas per dosen
+    print("\n" + "="*80)
+    print("[CAP] MEMERIKSA PEMBATASAN SECTION (Maksimal 4 Kelas per Dosen)")
+    print("="*80)
     
-    logger.info(f"[RESET] Reset lecturer_name field for {len(all_sections)} sections")
+    # Step 1: Hitung total kelas (section) per dosen dari SEMUA section
+    lecturer_total_sections = {}
+    for sec in all_sections:
+        lecturer = sec.get('lecturer') or sec.get('dosen')
+        if lecturer:
+            lecturer_total_sections[lecturer] = lecturer_total_sections.get(lecturer, 0) + 1
+    
+    print("\n📊 Jumlah Kelas per Dosen Saat Ini:")
+    for lect, total in sorted(lecturer_total_sections.items(), key=lambda x: x[1], reverse=True):
+        status = "✓ OK" if total <= 4 else "⚠️ OVERLOAD"
+        print(f"  {status} {lect}: {total} kelas")
+    
+    # Step 2: Kelompokkan section per mata kuliah
+    sections_by_course_cap = {}
+    for sec in all_sections:
+        course_id = sec.get('course_id')
+        if course_id:
+            if course_id not in sections_by_course_cap:
+                sections_by_course_cap[course_id] = []
+            sections_by_course_cap[course_id].append(sec)
+    
+    removed_sections = []  # Track section yang dihapus
+    sections_to_delete_ids = []  # IDs to delete from DB
+    
+    # Step 3: Untuk setiap mata kuliah, batasi section berdasarkan aturan
+    for course_id, course_sections in sections_by_course_cap.items():
+        try:
+            course = courses_collection.find_one({"_id": ObjectId(course_id)})
+            if not course:
+                continue
+            
+            selected_by = course.get('selected_by', [])
+            if isinstance(selected_by, str):
+                selected_by = [selected_by]
+            selected_by = [l for l in selected_by if l]  # Remove empty
+            
+            num_lecturers = len(selected_by)
+            num_sections = len(course_sections)
+            
+            # Skip jika tidak ada dosen
+            if num_lecturers == 0:
+                continue
+            
+            print(f"\n[CHECK] {course.get('course_name')}: {num_sections} section, {num_lecturers} dosen")
+            
+            # ATURAN 1: Jika hanya 1 dosen dan > 2 section → max 2 section
+            if num_lecturers == 1 and num_sections > 2:
+                kept_sections = course_sections[:2]
+                removed = course_sections[2:]
+                
+                for sec in removed:
+                    sections_to_delete_ids.append(sec['_id'])
+                    removed_sections.append({
+                        'course_id': sec.get('course_id'),
+                        'course_name': sec.get('course_name'),
+                        'section_label': sec.get('section_label'),
+                        'lecturer': sec.get('lecturer') or sec.get('dosen'),
+                        'reason': f'Hanya 1 dosen memilih mata kuliah ini, maksimal 2 section dijadwalkan (dari {num_sections} section)',
+                        'removed_at': datetime.now()
+                    })
+                
+                print(f"  [CAP] 1 dosen, {num_sections} section → hanya 2 section dijadwalkan, {len(removed)} section dihapus")
+            
+            # ATURAN 2: Batasi setiap dosen maksimal 4 kelas total
+            else:
+                # Cek setiap dosen di mata kuliah ini
+                for lect in selected_by:
+                    lect_sections = [s for s in course_sections if (s.get('lecturer') or s.get('dosen')) == lect]
+                    current_total = lecturer_total_sections.get(lect, 0)
+                    
+                    # Jika dosen sudah punya >= 4 kelas, hapus semua section di MK ini
+                    if current_total > 4:
+                        for sec in lect_sections:
+                            sections_to_delete_ids.append(sec['_id'])
+                            removed_sections.append({
+                                'course_id': sec.get('course_id'),
+                                'course_name': sec.get('course_name'),
+                                'section_label': sec.get('section_label'),
+                                'lecturer': lect,
+                                'reason': f'Dosen sudah mengajar {current_total} kelas (maksimal 4 kelas)',
+                                'removed_at': datetime.now()
+                            })
+                        
+                        if lect_sections:
+                            print(f"  [CAP] {lect}: {current_total} kelas → hapus {len(lect_sections)} section dari MK ini")
+                    
+                    # Jika dosen punya < 4 kelas tapi dengan section di MK ini akan > 4, batasi
+                    elif current_total + len(lect_sections) > 4:
+                        allowed = 4 - current_total
+                        if allowed > 0:
+                            to_keep = lect_sections[:allowed]
+                            to_remove = lect_sections[allowed:]
+                            
+                            for sec in to_remove:
+                                sections_to_delete_ids.append(sec['_id'])
+                                removed_sections.append({
+                                    'course_id': sec.get('course_id'),
+                                    'course_name': sec.get('course_name'),
+                                    'section_label': sec.get('section_label'),
+                                    'lecturer': lect,
+                                    'reason': f'Dosen sudah mengajar {current_total} kelas, hanya bisa tambah {allowed} kelas lagi (maksimal 4 kelas)',
+                                    'removed_at': datetime.now()
+                                })
+                            
+                            print(f"  [CAP] {lect}: {current_total} kelas → simpan {allowed} section, hapus {len(to_remove)} section")
+        
+        except Exception as e:
+            print(f"[ERROR] Gagal memeriksa course {course_id}: {e}")
+            continue
+    
+    # Hapus section berlebih dari database
+    if sections_to_delete_ids:
+        result = sections_collection.delete_many({"_id": {"$in": sections_to_delete_ids}})
+        print(f"\n[CAP] {result.deleted_count} section dihapus dari database")
+        
+        # Simpan log section yang dihapus
+        if removed_sections:
+            removed_sections_collection.delete_many({})  # Clear old logs
+            removed_sections_collection.insert_many(removed_sections)
+            print(f"[LOG] {len(removed_sections)} section dicatat ke log")
+        
+        # Reload sections setelah penghapusan
+        all_sections = list(sections_collection.find())
+        print(f"[CAP] Section tersisa untuk dijadwalkan: {len(all_sections)}")
+    else:
+        print("[CAP] Tidak ada section yang perlu dihapus")
+    
+    print("="*80 + "\n")
 
     # To filter, need course info for each section
     if semester_type != 'semua':
@@ -7754,24 +6750,10 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
     
     # AUTO-ASSIGN LECTURERS TO SECTIONS based on selected_by (capacity-aware)
     print("\n" + "="*80)
-    print("AUTO-ASSIGNING LECTURERS TO SECTIONS (capacity-aware, respects max_load)")
+    print("AUTO-ASSIGNING LECTURERS TO SECTIONS (fair distribution across courses)")
     print("="*80)
     
-    # STEP 1: Hitung berapa MK yang diambil setiap dosen
-    lecturer_courses_map = {}  # {lecturer: [course_ids]}
-    course_lecturers_map = {}  # {course_id: [lecturers]}
-    
-    for course in courses_collection.find():
-        course_id = str(course['_id'])
-        selected_by = course.get('selected_by', [])
-        if selected_by:
-            course_lecturers_map[course_id] = selected_by
-            for lect in selected_by:
-                if lect not in lecturer_courses_map:
-                    lecturer_courses_map[lect] = []
-                lecturer_courses_map[lect].append(course_id)
-    
-    # STEP 2: Group sections by course_id
+    # Group sections by course_id
     sections_by_course = {}
     for sec in sections:
         course_id = sec.get('course_id')
@@ -7780,34 +6762,7 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                 sections_by_course[course_id] = []
             sections_by_course[course_id].append(sec)
     
-    # STEP 3: Calculate target sections per lecturer per course
-    # Aturan: 1 MK = 4 section, 2 MK = 2 section/MK
-    lecturer_target_sections = {}  # {lecturer: {course_id: target_sections}}
-    
-    print("\n📊 PRE-ALLOCATION ANALYSIS:")
-    for lect, course_ids in sorted(lecturer_courses_map.items()):
-        num_courses = len(course_ids)
-        
-        if num_courses == 1:
-            target_per_course = 4
-        elif num_courses == 2:
-            target_per_course = 2
-        else:
-            target_per_course = max(1, 4 // num_courses)
-        
-        lecturer_target_sections[lect] = {}
-        course_names = []
-        for cid in course_ids:
-            lecturer_target_sections[lect][cid] = target_per_course
-            # Get course name for display
-            course = courses_collection.find_one({"_id": ObjectId(cid)})
-            if course:
-                course_names.append(course.get('course_name', cid))
-        
-        print(f"  {lect}: {num_courses} MK → {target_per_course} section/MK")
-        print(f"    Courses: {', '.join(course_names)}")
-    
-    # STEP 4: Preload lecturer max_load preferences (default 12)
+    # Preload lecturer max_load preferences (default 12)
     lecturer_max_sks = {}
     if users_collection is not None:
         for user in users_collection.find({"role": "dosen"}):
@@ -7816,243 +6771,243 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
             if name:
                 lecturer_max_sks[name] = int(prefs.get("max_load", 12) or 12)
     
-    # Running tally of SKS assigned in this pass
-    lecturer_current_sks = {}
-    lecturer_assigned_sections = {}  # {lecturer: {course_id: count}}
-
-    assigned_count = 0
-    
-    # STEP 5: PRIORITIZED ASSIGNMENT - Ensure each lecturer gets sections from ALL their courses
-    print("\n📋 ASSIGNING SECTIONS WITH PRIORITY:")
-    
+    # PRE-CALCULATE: Build lecturer -> courses mapping
+    lecturer_courses = {}
+    course_details = {}
     for course_id, course_sections in sections_by_course.items():
-        # SORT sections by section_number untuk ensure assignment selalu mulai dari A1, A2, A3, dst
-        # Ini CRITICAL untuk prevent CAP:FAIR delete wrong section!
-        # Tanpa sort, sections bisa random order (A3, A1, A4, A2) → assignment salah
-        course_sections.sort(key=lambda s: int(s.get('section_number', 0)))
-        
-        # Get course info
-        course = None
         try:
             if isinstance(course_id, str):
                 course_obj_id = ObjectId(course_id)
             else:
                 course_obj_id = course_id
             course = courses_collection.find_one({"_id": course_obj_id})
-        except Exception as e:
-            print(f"[DEBUG] Course ID lookup failed for {course_id}: {e}")
+        except Exception:
+            course = None
+        
+        if not course and course_sections:
+            course_name = course_sections[0].get('course_name')
+            if course_name:
+                course = courses_collection.find_one({
+                    "course_name": {"$regex": f"^{course_name}$", "$options": "i"}
+                })
         
         if not course:
-            print(f"[ERROR] Course not found for ID {course_id}")
             continue
         
         course_name = course.get('course_name', 'Unknown')
         selected_by = course.get('selected_by', [])
+        sks = int(course.get('sks', 2) or 2)
         
-        # DEBUG: Print selected_by for problematic courses
-        if 'LOGIKA' in course_name or 'SISTEM MANAJEMEN DATABASE' in course_name or 'METODOLOGI' in course_name or 'KEAMANAN' in course_name:
-            print(f"[DEBUG SELECTED_BY] {course_name}: selected_by = {selected_by}")
+        course_details[course_id] = {
+            'name': course_name,
+            'selected_by': selected_by,
+            'sks': sks,
+            'num_sections': len(course_sections)
+        }
+        
+        for lect in selected_by:
+            if lect not in lecturer_courses:
+                lecturer_courses[lect] = []
+            lecturer_courses[lect].append(course_id)
+    
+    # Calculate fair distribution: each lecturer should get sections from ALL their courses
+    # Strategy: PRIORITY 1 section per course first, then distribute remaining proportionally
+    print("\n📊 Pre-allocation analysis:")
+    lecturer_allocations = {}  # lecturer -> {course_id: num_sections}
+    
+    for lect, course_ids in lecturer_courses.items():
+        max_cap = int(lecturer_max_sks.get(lect, 12) or 12)
+        
+        # Calculate fair share per course: sections_available / num_lecturers_selected
+        course_fair_shares = {}
+        course_sks = {}
+        for cid in course_ids:
+            cd = course_details[cid]
+            num_sections_available = cd['num_sections']
+            num_lecturers_selected = len(cd['selected_by'])
+            fair_share = num_sections_available / num_lecturers_selected
+            course_fair_shares[cid] = fair_share
+            course_sks[cid] = cd['sks']
+        
+        # ALLOCATION: 2-phase water-filling
+        # 1) Give 1 section per course (if capacity allows)
+        # 2) Round-robin up to ideal = round(fair_share) while capacity remains
+        allocations = {cid: 0 for cid in course_ids}
+        total_allocated_sks = 0
+        courses_sorted_by_fair_share = sorted(course_ids, key=lambda c: course_fair_shares[c], reverse=True)
+        
+        # Phase 1: baseline 1 section per course (respect capacity)
+        for cid in courses_sorted_by_fair_share:
+            sks = course_sks[cid]
+            if total_allocated_sks + sks <= max_cap:
+                allocations[cid] = 1
+                total_allocated_sks += sks
+            else:
+                break
+        
+        remaining_sks = max_cap - total_allocated_sks
+        if remaining_sks > 0:
+            # Phase 2: round-robin toward ideal allocations
+            ideal_allocs = {cid: max(1, round(course_fair_shares[cid])) for cid in course_ids}
+            allocation_attempts = 0
+            max_attempts = len(course_ids) * 10  # Prevent infinite loops
+            
+            while remaining_sks > 0 and allocation_attempts < max_attempts:
+                allocation_attempts += 1
+                allocated_this_round = False
+                
+                for cid in courses_sorted_by_fair_share:
+                    if remaining_sks <= 0:
+                        break
+                    sks = course_sks[cid]
+                    if allocations[cid] < ideal_allocs[cid] and remaining_sks >= sks:
+                        allocations[cid] += 1
+                        remaining_sks -= sks
+                        total_allocated_sks += sks
+                        allocated_this_round = True
+                
+                if not allocated_this_round:
+                    break
+        
+        lecturer_allocations[lect] = allocations
+        
+        if allocations:
+            course_summary = ', '.join([f'{course_details[cid]["name"]}({allocations[cid]})' for cid in sorted(allocations.keys(), key=lambda x: course_details[x]["name"])[:2]])
+            suffix = '...' if len(course_ids) > 2 else ''
+            print(f"  {lect}: {len(course_ids)} courses, {total_allocated_sks} SKS → {course_summary}{suffix}")
+        else:
+            print(f"  ⚠️  {lect}: No capacity for any course")
+    
+    # Now assign sections based on pre-calculated allocations
+    print("\n" + "="*80)
+    print("ASSIGNING SECTIONS (using pre-calculated fair distribution)")
+    print("="*80)
+    
+    lecturer_current_sks = {}
+    assigned_count = 0
+    deleted_sections = []
+    for course_id, course_sections in sections_by_course.items():
+        if course_id not in course_details:
+            continue
+            
+        cd = course_details[course_id]
+        course_name = cd['name']
+        selected_by = cd['selected_by']
+        sks_course = cd['sks']
         
         if not selected_by or len(selected_by) == 0:
-            print(f"[SKIP] {course_name}: No lecturers selected (keeping 'Unassigned')")
+            print(f"[SKIP] {course_name}: No lecturers selected")
             continue
         
         num_sections = len(course_sections)
-        sks_course = int(course.get('sks', 2) or 2)
-        
-        # Initialize tracking for this course
+        print(f"[ASSIGN] {course_name}: {num_sections} sections, {sks_course} SKS each → {len(selected_by)} lecturers")
+
+        # Initialize missing lecturers in current_sks map
         for lect in selected_by:
             if lect not in lecturer_current_sks:
                 lecturer_current_sks[lect] = 0
-            if lect not in lecturer_assigned_sections:
-                lecturer_assigned_sections[lect] = {}
-            if course_id not in lecturer_assigned_sections[lect]:
-                lecturer_assigned_sections[lect][course_id] = 0
         
-        # Calculate distribution based on target sections
-        distribution = {}
+        # Track how many sections each lecturer should get from this course (from pre-allocation)
+        lecturer_quota = {}
         for lect in selected_by:
-            target = lecturer_target_sections.get(lect, {}).get(course_id, 2)
-            distribution[lect] = target
-        
-        # Adjust distribution to match available sections
-        total_target = sum(distribution.values())
-        
-        if total_target > num_sections:
-            # Need to reduce: scale down proportionally
-            scale = num_sections / total_target
-            for lect in distribution:
-                distribution[lect] = max(1, int(distribution[lect] * scale))
-            
-            # Fine-tune to exactly match num_sections
-            current_total = sum(distribution.values())
-            if current_total < num_sections:
-                # Add remainder to lecturers with lowest current count
-                diff = num_sections - current_total
-                sorted_lecturers = sorted(selected_by, key=lambda l: distribution[l])
-                for i in range(diff):
-                    distribution[sorted_lecturers[i % len(sorted_lecturers)]] += 1
-            elif current_total > num_sections:
-                # Remove excess from lecturers with highest count
-                diff = current_total - num_sections
-                sorted_lecturers = sorted(selected_by, key=lambda l: distribution[l], reverse=True)
-                for i in range(diff):
-                    if distribution[sorted_lecturers[i % len(sorted_lecturers)]] > 1:
-                        distribution[sorted_lecturers[i % len(sorted_lecturers)]] -= 1
-        
-        elif total_target < num_sections:
-            # Ada extra sections TAPI hormati batas target
-            # JANGAN force assign semua section jika melanggar aturan distribusi
-            # Contoh: MARYANA punya 2 MK, target 2 section dari LOGIKA, meskipun ada 6 section
-            print(f"  ℹ️  INFO: Course punya {num_sections} sections tapi total target cuma {total_target}")
-            print(f"      Pertahankan target distribution (excess akan dihapus di fase CAP:FAIR)")
-            # JANGAN tambah section - biar CAP:FAIR yang hapus excess-nya
-        
-        # Verifikasi akhir: Cek apakah distribusi sesuai ekspektasi
-        final_total = sum(distribution.values())
-        if final_total != num_sections:
-            # Ini normal kalau total_target < num_sections
-            # Section excess akan dihapus oleh CAP:FAIR
-            if total_target < num_sections:
-                print(f"  ℹ️  INFO: Assigned {final_total}/{num_sections} sections (excess akan dihapus oleh CAP:FAIR)")
+            if lect in lecturer_allocations and course_id in lecturer_allocations[lect]:
+                lecturer_quota[lect] = lecturer_allocations[lect][course_id]
             else:
-                print(f"  ⚠️  WARNING: Distribution total ({final_total}) != available sections ({num_sections})")
-                print(f"      Ini mungkin indikasi ada bug perhitungan.")
+                lecturer_quota[lect] = 0
         
-        print(f"\n[ASSIGN] {course_name}: {num_sections} sections → {len(selected_by)} lecturers")
-        dist_str = ", ".join([f"{lect}:{distribution[lect]}" for lect in selected_by])
-        print(f"  Distribution: {dist_str} (Total: {sum(distribution.values())})")
-        
-        # Assign sections according to distribution
-        section_idx = 0
-        for lect in selected_by:
-            sections_to_assign = distribution.get(lect, 0)
-            for i in range(sections_to_assign):
-                if section_idx >= len(course_sections):
-                    break
+        # Track sections assigned per lecturer for this course
+        lecturer_assigned_this_course = {lect: 0 for lect in selected_by}
+
+        # Assign sections respecting pre-calculated quotas
+        sections_to_delete = []
+        for sec in course_sections:
+            # Build candidate list: lecturers who haven't reached their quota for this course AND won't exceed max_sks
+            eligible = []
+            for lect in selected_by:
+                cur = int(lecturer_current_sks.get(lect, 0))
+                max_cap = int(lecturer_max_sks.get(lect, 12) or 12)
+                quota = lecturer_quota[lect]
+                already_assigned = lecturer_assigned_this_course[lect]
                 
-                sec = course_sections[section_idx]
-                lect_value = lect
+                # Check: has quota remaining AND won't exceed global max
+                if already_assigned < quota and (cur + sks_course) <= max_cap:
+                    eligible.append((already_assigned, cur, lect))
+            
+            if not eligible:
+                # NO eligible candidates respecting quota - TRY RELAXED ALLOCATION
+                # Check if any lecturer has < 4 sections for this course AND < 12 SKS total
+                relaxed_eligible = []
+                for lect in selected_by:
+                    cur = int(lecturer_current_sks.get(lect, 0))
+                    max_cap = int(lecturer_max_sks.get(lect, 12) or 12)
+                    already_assigned = lecturer_assigned_this_course[lect]
+                    
+                    # Relaxed: ignore quota, just check CAP (4 sections per course) and SKS
+                    if already_assigned < 4 and (cur + sks_course) <= max_cap:
+                        relaxed_eligible.append((already_assigned, cur, lect))
                 
-                # DEBUG: Log what we're assigning
-                if 'SISTEM MANAJEMEN' in course_name or 'METODOLOGI' in course_name or 'KEAMANAN' in course_name or 'LOGIKA' in course_name:
-                    print(f"  [DEBUG ASSIGN] Assigning section to {course_name} A{sec.get('section_number')}: lect='{lect_value}'")
+                if not relaxed_eligible:
+                    # STILL no eligible - DELETE this section
+                    sections_to_delete.append(sec)
+                    deleted_sections.append({
+                        'course_name': course_name,
+                        'section_label': sec.get('section_label', 'N/A'),
+                        'sks': sks_course,
+                        'reason': 'All lecturers at capacity or quota exhausted'
+                    })
+                    print(f"   ❌ DELETE: {sec.get('section_label', 'N/A')} - no eligible lecturers")
+                    continue
                 
-                # Update database
+                # Relaxed allocation found - assign to lecturer with lowest count this course
+                relaxed_eligible.sort(key=lambda t: (t[0], t[1]))
+                chosen = relaxed_eligible[0][2]
+                
+                # Persist assignment
                 sections_collection.update_one(
                     {"_id": sec["_id"]},
-                    {"$set": {
-                        "lecturer": lect_value,
-                        "dosen": lect_value,
-                        "lecturer_name": lect_value
-                    }}
+                    {"$set": {"lecturer": chosen, "dosen": chosen}}
                 )
-                
-                # Update in-memory section - DIRECT APPROACH
-                # Update the dict directly since it's a reference
-                sec['lecturer'] = lect_value
-                sec['dosen'] = lect_value
-                sec['lecturer_name'] = lect_value
-                
-                # Verify by searching sections array
-                sec_id = sec.get('_id')
-                found = False
-                if sec_id:
-                    for idx in range(len(sections)):
-                        if sections[idx].get('_id') == sec_id:
-                            sections[idx]['lecturer'] = lect_value
-                            sections[idx]['dosen'] = lect_value
-                            sections[idx]['lecturer_name'] = lect_value
-                            found = True
-                            break
-                    
-                    # If not found in sections array, it means section was deleted
-                    # This is OK - we already updated database and local ref
-                    if not found:
-                        pass  # Section already deleted from sections array, but DB updated
-                
-                lecturer_current_sks[lect_value] = lecturer_current_sks.get(lect_value, 0) + sks_course
-                lecturer_assigned_sections[lect][course_id] = lecturer_assigned_sections[lect].get(course_id, 0) + 1
+                sec['lecturer'] = chosen
+                sec['dosen'] = chosen
+                lecturer_current_sks[chosen] = lecturer_current_sks.get(chosen, 0) + sks_course
+                lecturer_assigned_this_course[chosen] += 1
                 assigned_count += 1
-                section_idx += 1
+                print(f"   ✅ ASSIGNED (relaxed): {sec.get('section_label', 'N/A')} to {chosen} (override quota, still respecting CAP)")
+                continue
+            
+            # Pick lecturer with lowest quota fulfillment first (fair distribution), then lowest current SKS
+            eligible.sort(key=lambda t: (t[0], t[1]))
+            chosen = eligible[0][2]
+            
+            # Persist assignment
+            sections_collection.update_one(
+                {"_id": sec["_id"]},
+                {"$set": {"lecturer": chosen, "dosen": chosen}}
+            )
+            sec['lecturer'] = chosen
+            sec['dosen'] = chosen
+            lecturer_current_sks[chosen] = lecturer_current_sks.get(chosen, 0) + sks_course
+            lecturer_assigned_this_course[chosen] += 1
+            assigned_count += 1
         
-        # Log assigned counts
-        assigned_str = ", ".join([f"{lect}={lecturer_assigned_sections[lect].get(course_id, 0)}" for lect in selected_by])
-        print(f"  Assigned: {assigned_str}")
+        # Execute deletion for this course
+        if sections_to_delete:
+            delete_ids = [s['_id'] for s in sections_to_delete]
+            sections_collection.delete_many({"_id": {"$in": delete_ids}})
+            print(f"   🗑️  Deleted {len(sections_to_delete)} section(s) from database")
+        # Log per-lecturer impact (top 3)
+        top3 = sorted([(l, lecturer_current_sks.get(l,0)) for l in selected_by], key=lambda x: x[1], reverse=True)[:3]
+        if top3:
+            print("   Load sample:", ", ".join([f"{n}={s} SKS" for n,s in top3]))
     
-    print(f"\n[OK] Total {assigned_count} sections assigned to lecturers")
+    if deleted_sections:
+        print(f"\n❌ DELETED {len(deleted_sections)} sections due to capacity constraints:")
+        for ds in deleted_sections[:10]:  # Show first 10
+            print(f"   - {ds['course_name']} {ds['section_label']}: {ds['reason']}")
+        if len(deleted_sections) > 10:
+            print(f"   ... and {len(deleted_sections) - 10} more")
     
-    # VERIFICATION: Check if all lecturers got sections from all their courses
-    print("\n✅ VERIFICATION - Lecturers Coverage:")
-    missing_coverage = []
-    for lect, course_ids in sorted(lecturer_courses_map.items()):
-        assigned = lecturer_assigned_sections.get(lect, {})
-        missing = [cid for cid in course_ids if assigned.get(cid, 0) == 0]
-        if missing:
-            missing_names = []
-            for cid in missing:
-                course = courses_collection.find_one({"_id": ObjectId(cid)})
-                if course:
-                    missing_names.append(course.get('course_name', cid))
-            print(f"  ⚠️  {lect}: Missing sections from {len(missing)} MK: {', '.join(missing_names)}")
-            missing_coverage.append(lect)
-        else:
-            total_sections = sum(assigned.values())
-            print(f"  ✅ {lect}: {total_sections} sections from {len(course_ids)} MK")
-    
-    if missing_coverage:
-        print(f"\n⚠️  WARNING: {len(missing_coverage)} lecturers missing sections from some courses!")
-    else:
-        print(f"\n✅ All lecturers have sections from all their selected courses!")
-    
-    # CHECK FOR UNASSIGNED SECTIONS
-    print("\n🔍 CHECKING FOR UNASSIGNED SECTIONS:")
-    unassigned_sections = []
-    for sec in sections:
-        # Cek semua kemungkinan field lecturer
-        lect = sec.get('lecturer_name') or sec.get('dosen') or sec.get('lecturer')
-        if not lect or lect == 'Unassigned':
-            unassigned_sections.append(sec)
-    
-    if unassigned_sections:
-        # Group by course
-        unassigned_by_course = {}
-        total_sks = 0
-        for sec in unassigned_sections:
-            course_name = sec.get('course_name', 'Unknown')
-            sks = sec.get('sks', 3)
-            if course_name not in unassigned_by_course:
-                unassigned_by_course[course_name] = {'count': 0, 'sks': sks}
-            unassigned_by_course[course_name]['count'] += 1
-            total_sks += sks
-        
-        print(f"  ⚠️  Found {len(unassigned_sections)} UNASSIGNED sections ({total_sks} SKS total):")
-        for course_name, info in sorted(unassigned_by_course.items()):
-            print(f"     - {course_name}: {info['count']} sections ({info['count'] * info['sks']} SKS)")
-        
-        # Check if these courses have selected_by
-        print("\n  Reason analysis:")
-        for course_name in unassigned_by_course.keys():
-            course = courses_collection.find_one({"course_name": course_name})
-            if course:
-                selected_by = course.get('selected_by', [])
-                if not selected_by:
-                    print(f"     ❌ {course_name}: No lecturers selected this course")
-                else:
-                    print(f"     ℹ️  {course_name}: {len(selected_by)} lecturers selected - these are EXCESS sections (target distribution already met)")
-        
-        # DELETE unassigned sections (they are excess sections beyond target distribution)
-        print(f"\n  🗑️  Deleting {len(unassigned_sections)} excess unassigned sections...")
-        deleted_count = 0
-        for sec in unassigned_sections:
-            result = sections_collection.delete_one({"_id": sec["_id"]})
-            if result.deleted_count > 0:
-                deleted_count += 1
-        print(f"  ✅ Deleted {deleted_count} unassigned sections")
-    else:
-        print(f"  ✅ No unassigned sections found!")
-    
-    print()
+    print(f"\n[OK] Total {assigned_count} sections assigned to lecturers\n")
     
     # Reload sections dengan assignment terbaru
     sections = list(sections_collection.find())
@@ -8133,11 +7088,10 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
             # Pilih penerima dengan SKS terendah
             candidates.sort(key=lambda t: t[0])
             receiver = candidates[0][1]
-            # Update DB & state - UPDATE ALL 3 FIELDS (lecturer, dosen, lecturer_name)
-            sections_collection.update_one({"_id": sec["_id"]}, {"$set": {"lecturer": receiver, "dosen": receiver, "lecturer_name": receiver}})
+            # Update DB & state
+            sections_collection.update_one({"_id": sec["_id"]}, {"$set": {"lecturer": receiver, "dosen": receiver}})
             sections[sec_idx]['lecturer'] = receiver
             sections[sec_idx]['dosen'] = receiver
-            sections[sec_idx]['lecturer_name'] = receiver
             # Jangan pernah menambah receiver ke selected_by secara otomatis (strict)
             # Update indeks
             lecturer_sections_idx[donor_name].remove(sec_idx)
@@ -8160,19 +7114,6 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
 
     # Rebuild sections list setelah kemungkinan perpindahan
     sections = list(sections_collection.find())
-
-    # CRITICAL DEBUG: Verify section field consistency BEFORE STEP B
-    print("\n[DEBUG PRE-CAPFAIR] Checking field consistency before CAP:FAIR:")
-    for sec in sections:
-        lect = sec.get('dosen') or sec.get('lecturer')
-        if lect and ('SISTEM MANAJEMEN' in sec.get('course_name', '') or 'METODOLOGI' in sec.get('course_name', '') or 'KEAMANAN' in sec.get('course_name', '') or 'LOGIKA' in sec.get('course_name', '')):
-            lect_field = sec.get('lecturer', 'NONE')
-            dosen_field = sec.get('dosen', 'NONE')
-            lect_name_field = sec.get('lecturer_name', 'NONE')
-            mismatch = (lect_field != dosen_field) or (dosen_field != lect_name_field)
-            status = "❌ MISMATCH" if mismatch else "✅"
-            print(f"  {status} {sec.get('course_name', 'UNKNOWN')} {sec.get('section_label', 'UNKNOWN')}")
-            print(f"    lecturer='{lect_field}' | dosen='{dosen_field}' | lecturer_name='{lect_name_field}'")
 
     # ------------------------------
     # STEP B: REBALANCE UNTUK ANGKAT < MIN (tanpa melanggar cap penerima)
@@ -8230,11 +7171,10 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                 # Prefer donors remaining >= min after transfer; if not possible anywhere, we skip
                 if (donor_cur - sks) < min_load:
                     continue
-                # Perform transfer - UPDATE ALL 3 FIELDS (lecturer, dosen, lecturer_name)
-                sections_collection.update_one({"_id": sec["_id"]}, {"$set": {"lecturer": target_lect, "dosen": target_lect, "lecturer_name": target_lect}})
+                # Perform transfer
+                sections_collection.update_one({"_id": sec["_id"]}, {"$set": {"lecturer": target_lect, "dosen": target_lect}})
                 sections[sec_idx]['lecturer'] = target_lect
                 sections[sec_idx]['dosen'] = target_lect
-                sections[sec_idx]['lecturer_name'] = target_lect
                 # Jangan pernah menambah target_lect ke selected_by secara otomatis (strict)
                 lecturer_current_sks[donor] = donor_cur - sks
                 lecturer_current_sks[target_lect] = cur + sks
@@ -8249,173 +7189,6 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
     for lect, _ in under_min:
         try_raise_lecturer_to_min(lect)
     
-    # ------------------------------
-    # STEP C: HARD CAP JUMLAH SECTION PER DOSEN (maksimal 4 section)
-    # Dengan requirement: setiap MK yang diambil dosen harus dapat minimal 1 section
-    # Distribusi rata antar MK
-    # ------------------------------
-    try:
-        from collections import defaultdict, Counter
-        
-        # Clear previous removed sections log at the start of scheduling
-        if removed_sections_collection is not None:
-            try:
-                removed_sections_collection.delete_many({})
-                print("[CAP:FAIR] Cleared previous removed sections log")
-            except Exception as e:
-                print(f"[WARN] Could not clear removed sections log: {e}")
-        
-        sections_to_delete_ids = []
-        removed_sections_log = []
-        processed_sections = set()  # Track sections that have been processed to avoid duplicates
-        
-        print("\n[CAP:FAIR] Starting fair distribution enforcement...")
-        
-        # Process each lecturer ONE TIME ONLY
-        # Reload fresh data from DB to avoid stale state
-        fresh_sections = list(sections_collection.find())
-        
-        # Group sections by lecturer
-        lecturer_sections_map = defaultdict(list)
-        for sec in fresh_sections:
-            lect = sec.get('dosen') or sec.get('lecturer')
-            if lect:
-                lecturer_sections_map[lect].append(sec)
-        
-        for lect, sec_list in lecturer_sections_map.items():
-            total_sec = len(sec_list)
-            
-            # Hitung jumlah MK unik untuk dosen ini
-            course_ids = set([s.get('course_id') for s in sec_list])
-            num_courses = len(course_ids)
-            
-            # ATURAN BARU DISTRIBUSI:
-            # - Dosen ambil 1 MK → 4 section untuk MK tersebut
-            # - Dosen ambil 2 MK → 2 section per MK (total 4 section)
-            # - Dosen ambil >2 MK → distribusi merata dengan max 4 total
-            
-            if num_courses == 0:
-                continue
-            elif num_courses == 1:
-                target_per_course = 4
-                max_total_sections = 4
-            elif num_courses == 2:
-                target_per_course = 2
-                max_total_sections = 4
-            else:
-                target_per_course = max(1, 4 // num_courses)
-                max_total_sections = 4
-            
-            # Skip jika sudah sesuai target
-            if total_sec <= max_total_sections:
-                continue
-            
-            print(f"\n[CAP:FAIR] {lect}: {total_sec} section, {num_courses} MK")
-            print(f"  Target: {target_per_course} section per MK, total max {max_total_sections}")
-            
-            # Group sections by course_id
-            sections_by_course = defaultdict(list)
-            for sec in sec_list:
-                sections_by_course[sec.get('course_id')].append(sec)
-            
-            # Process each course for this lecturer
-            for course_id, course_sections in sections_by_course.items():
-                num_in_course = len(course_sections)
-                if num_in_course > target_per_course:
-                    # Hapus excess sections dari course ini
-                    excess_in_course = num_in_course - target_per_course
-                    # Urutkan dari section number terbesar ke terkecil (hapus yang nomor tinggi dulu)
-                    sorted_secs = sorted(course_sections, key=lambda s: int(s.get('section_number') or 0), reverse=True)
-                    
-                    for i in range(excess_in_course):
-                        sec_to_remove = sorted_secs[i]
-                        sec_id = sec_to_remove['_id']
-                        
-                        # Skip if already processed
-                        if sec_id in processed_sections:
-                            continue
-                        processed_sections.add(sec_id)
-                        
-                        # SEBELUM DELETE: coba reallocate ke lecturer lain di course yang sama
-                        # Get fresh count from DB for other lecturers
-                        other_lecturers_in_course = []
-                        for other_sec in fresh_sections:
-                            if (other_sec.get('course_id') == course_id and 
-                                (other_sec.get('dosen') or other_sec.get('lecturer')) != lect):
-                                other_lect = other_sec.get('dosen') or other_sec.get('lecturer')
-                                if other_lect:
-                                    other_lecturers_in_course.append(other_lect)
-                        
-                        other_lecturers_in_course = list(set(other_lecturers_in_course))
-                        reallocated = False
-                        
-                        for other_lect in other_lecturers_in_course:
-                            # Count from FRESH data
-                            other_lect_count = len([s for s in fresh_sections 
-                                                   if (s.get('course_id') == course_id and 
-                                                       (s.get('dosen') or s.get('lecturer')) == other_lect)])
-                            
-                            if other_lect_count < target_per_course:
-                                # Reallocate section to other lecturer
-                                sections_collection.update_one(
-                                    {"_id": sec_id},
-                                    {"$set": {
-                                        'dosen': other_lect,
-                                        'lecturer': other_lect,
-                                        'lecturer_name': other_lect
-                                    }}
-                                )
-                                print(f"    ✓ Reallocate {sec_to_remove.get('section_label')} dari {lect} ke {other_lect}")
-                                reallocated = True
-                                # Update fresh data immediately
-                                for s in fresh_sections:
-                                    if s['_id'] == sec_id:
-                                        s['dosen'] = other_lect
-                                        s['lecturer'] = other_lect
-                                        s['lecturer_name'] = other_lect
-                                break
-                        
-                        # If no reallocation possible, mark for deletion
-                        if not reallocated:
-                            sections_to_delete_ids.append(sec_to_remove['_id'])
-                            removed_sections_log.append({
-                                'course_id': sec_to_remove.get('course_id'),
-                                'course_name': sec_to_remove.get('course_name'),
-                                'section_label': sec_to_remove.get('section_label'),
-                                'lecturer': lect,
-                                'reason': f"Cap fair distribution: {num_courses} MK, max 4 section total → {target_per_course} section per MK",
-                                'removed_at': datetime.now()
-                            })
-                            print(f"    ✗ Delete {sec_to_remove.get('section_label')} (no other lecturer available for reallocation)")
-
-        if sections_to_delete_ids:
-            # Remove duplicates from delete list
-            sections_to_delete_ids = list(set(sections_to_delete_ids))
-            result = sections_collection.delete_many({"_id": {"$in": sections_to_delete_ids}})
-            print(f"\n[CAP:FAIR] Deleted {result.deleted_count} section(s) for fair distribution")
-            print(f"  Logic: 1 MK = 4 sections, 2 MK = 2 sections/MK (total 4)")
-            
-            if removed_sections_log and removed_sections_collection is not None:
-                try:
-                    # Deduplicate logs by section_label + lecturer
-                    unique_logs = {}
-                    for log in removed_sections_log:
-                        key = (log.get('section_label'), log.get('lecturer'))
-                        if key not in unique_logs:
-                            unique_logs[key] = log
-                    
-                    if unique_logs:
-                        removed_sections_collection.insert_many(list(unique_logs.values()))
-                except Exception as e:
-                    print(f"[WARN] Failed to log removed sections: {e}")
-            
-            # Reload sections after deletion
-            sections = list(sections_collection.find())
-        else:
-            print("\n[CAP:FAIR] All lecturers meet target distribution (1 MK = 4 sec, 2 MK = 2 sec/MK)")
-    except Exception as e:
-        print(f"[WARN] Gagal menerapkan cap fair distribution: {e}")
-
     # Load lecturer preferences from database
     print("\n[INFO] Loading lecturer preferences...")
     lecturer_preferences = {}
@@ -8450,7 +7223,7 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
     print(f"[OK] Loaded preferences for {len(lecturer_preferences)} lecturers\n")
     
     print(f"\n{'='*80}")
-    print(f"GREEDY SCHEDULING ALGORITHM (WITH LECTURER PREFERENCES)")
+    print(f"Or-Tools SCHEDULING ALGORITHM (WITH LECTURER PREFERENCES)")
     print(f"{'='*80}")
     print(f"Scheduling {len(sections)} sections...")
     print(f"{'='*80}\n")
@@ -9903,6 +8676,13 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
     else:
         flash(f"✅ Penjadwalan selesai! Total {len(new_sched)} slot tanpa bentrok. Semua dosen mengajar 2-3 hari.", "success")
     
+    # ⏱️ END TIMING - Greedy Scheduling Algorithm
+    scheduling_end_time = time.time()
+    scheduling_elapsed = scheduling_end_time - scheduling_start_time
+    
+    print(f"\n⏱️  SCHEDULING COMPUTATION TIME: {scheduling_elapsed:.2f} seconds ({scheduling_elapsed/60:.2f} minutes)")
+    logger.info(f"⏱️  Scheduling completed in {scheduling_elapsed:.2f} seconds")
+    
     logger.info(f"\n{'='*80}")
     logger.info(f"🟢 FUNCTION END: schedule_sections_with_ortools() completed")
     logger.info(f"{'='*80}\n")
@@ -10232,7 +9012,8 @@ def route_generate_sections_ga():
     generate_sections_simple_pipeline(semester_type=semester_type)
 
     # After sections regenerated, repopulate selected_by so scheduler tidak skip dosen
-    # NOTE: apply_default_selected_by_mapping sedang di-comment - tidak diperlukan
+    # Note: apply_default_selected_by_mapping is deprecated/commented out
+    # Selected_by should be handled during section generation
     # try:
     #     updated = apply_default_selected_by_mapping()
     #     logger.info(f"[ASSIGN] selected_by repopulated for {updated} course(s) after section regeneration")
@@ -10568,7 +9349,7 @@ def add_section_manual():
 
 
 def schedule_new_sections_only(section_ids, sections_to_schedule=None):
-    """Schedule only specific new sections using greedy algorithm with preference checking
+    """Schedule only specific new sections using Or-tools algorithm with preference checking
     
     Args:
         section_ids: List of section IDs to schedule
@@ -11841,5 +10622,4 @@ def schedule_analytics():
 
 
 if __name__ == "__main__":
-
     app.run(debug=True)
