@@ -8460,11 +8460,24 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                             break
                     
                     if room_available:
+                        # Respect lecturer preferences: do not move into blocked day/time
+                        # Use relaxed day preference but enforce hard unavailability blocks
+                        allowed, new_pref_score = check_lecturer_preferences(
+                            lect, 'Kamis', start, end, strict_mode=False, is_online=False
+                        )
+                        if not allowed:
+                            # This time is blocked for the lecturer; try next timeblock
+                            continue
+                        
                         # Move the class!
                         new_sched[idx]['day'] = 'Kamis'
                         new_sched[idx]['room'] = available_room
                         new_sched[idx]['start'] = start
                         new_sched[idx]['end'] = end
+                        
+                        # Recompute preference score and match quality for the new placement
+                        new_sched[idx]['preference_score'] = new_pref_score
+                        new_sched[idx]['match_quality'] = get_match_quality(new_pref_score)
                         
                         print(f"  ✓ Moved {doc['course_name']} {doc['section_label']} to Kamis {tb} in {available_room}")
                         
@@ -10623,4 +10636,3 @@ def schedule_analytics():
 
 if __name__ == "__main__":
     app.run(debug=True)
-
