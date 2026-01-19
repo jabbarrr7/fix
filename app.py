@@ -7279,7 +7279,7 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
         """
         prefs = lecturer_preferences.get(lect, {})
         
-        # Check unavailable_time_ranges (HARD constraint for physical classes, SOFT for online)
+        # Check unavailable_time_ranges (HARD constraint for both physical and online)
         unavailable_ranges = prefs.get("unavailable_time_ranges", [])
         for block in unavailable_ranges:
             block_day = block.get('day', '*')
@@ -7289,11 +7289,8 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
             # Check if block applies to this day
             if block_day == '*' or block_day == day:
                 if times_overlap(time_start, time_end, block_start, block_end):
-                    if is_online:
-                        # For online classes, blocked times are just a preference (penalty), not hard constraint
-                        pass  # Allow but will reduce score below
-                    else:
-                        return False, 0  # Hard constraint violation for physical classes
+                    # Hard constraint violation for any class type (including ONLINE)
+                    return False, 0
         
         # Check available_days (strict vs relaxed)
         available_days = prefs.get("available_days", [])
@@ -7462,9 +7459,7 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
         
         placed = False
         
-        # FORCE ALL ONLINE SECTIONS TO RABU ONLY
-        # Online teaching is flexible, ignore lecturer preferences for day selection
-        # But still respect real lecturer schedule conflicts (if already scheduled)
+        # Prefer Rabu, namun hormati preferensi (blok waktu/hari) dan konflik dosen
         
         # Try sequential placement on Rabu first
         start_minutes = next_available_time
@@ -7480,17 +7475,19 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                 l == lect and d == ONLINE_DAY and times_overlap(start, end, s, e)
                 for (l, d, s, e) in lecturer_calendar.keys()
             )
-            
+            # Respect lecturer unavailability (hard) for ONLINE
             if not lect_conflict:
-                # Place it on Rabu with sequential time!
-                lecturer_calendar[(lect, ONLINE_DAY, start, end)] = si
-                schedule_result[si] = (ONLINE_DAY, "ONLINE", f"{start}-{end}")
-                lecturer_days_used[lect].add(ONLINE_DAY)
-                placed_count += 1
-                placed = True
-                
-                # Update next available time for Rabu
-                next_available_time = end_minutes
+                allowed, _ = check_lecturer_preferences(lect, ONLINE_DAY, start, end, strict_mode=True, is_online=True)
+                if allowed:
+                    # Place it on Rabu with sequential time!
+                    lecturer_calendar[(lect, ONLINE_DAY, start, end)] = si
+                    schedule_result[si] = (ONLINE_DAY, "ONLINE", f"{start}-{end}")
+                    lecturer_days_used[lect].add(ONLINE_DAY)
+                    placed_count += 1
+                    placed = True
+                    
+                    # Update next available time for Rabu
+                    next_available_time = end_minutes
         
         # If sequential placement failed due to time crunch, find any available slot on Rabu
         if not placed:
@@ -7507,17 +7504,48 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                 )
                 
                 if not lect_conflict:
-                    # Place it on Rabu!
-                    lecturer_calendar[(lect, ONLINE_DAY, start, end)] = si
-                    schedule_result[si] = (ONLINE_DAY, "ONLINE", f"{start}-{end}")
-                    lecturer_days_used[lect].add(ONLINE_DAY)
+                    allowed, _ = check_lecturer_preferences(lect, ONLINE_DAY, start, end, strict_mode=True, is_online=True)
+                    if allowed:
+                        # Place it on Rabu!
+                        lecturer_calendar[(lect, ONLINE_DAY, start, end)] = si
+                        schedule_result[si] = (ONLINE_DAY, "ONLINE", f"{start}-{end}")
+                        lecturer_days_used[lect].add(ONLINE_DAY)
+                        placed_count += 1
+                        placed = True
+                        break
+        
+        # If Rabu gagal, cari hari lain sesuai available_days dosen
+        if not placed:
+            valid_days = get_valid_days_for_lecturer(lect)
+            for day_alt in valid_days:
+                # Skip if already tried Rabu
+                if day_alt == ONLINE_DAY:
+                    continue
+                timeblocks = get_timeblocks_for_day(day_alt, sks)
+                for tb in timeblocks:
+                    start, end = tb.split('-')
+                    lect_conflict = any(
+                        l == lect and d == day_alt and times_overlap(start, end, s, e)
+                        for (l, d, s, e) in lecturer_calendar.keys()
+                    )
+                    if lect_conflict:
+                        continue
+                    allowed, _ = check_lecturer_preferences(lect, day_alt, start, end, strict_mode=True, is_online=True)
+                    if not allowed:
+                        continue
+                    # Place ONLINE on alternative day
+                    lecturer_calendar[(lect, day_alt, start, end)] = si
+                    schedule_result[si] = (day_alt, "ONLINE", f"{start}-{end}")
+                    lecturer_days_used[lect].add(day_alt)
                     placed_count += 1
                     placed = True
+                    break
+                if placed:
                     break
         
         if not placed:
             failed_sections.append((si, sec))
-            print(f"  ⚠️  Failed to place ONLINE section {si}: {sec.get('course_name', 'Unknown')} - {lect} (Rabu penuh)")
+            print(f"  ⚠️  Failed to place ONLINE section {si}: {sec.get('course_name', 'Unknown')} - {lect} (no valid day/time)")
     
     online_placed = len([s for s in schedule_result.values() if s[1] == 'ONLINE'])
     print(f"Online sections placed: {online_placed}/{len(online_sections)}")
@@ -8335,6 +8363,10 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
         lect = sec.get('dosen') or sec.get('lecturer')
         is_online = (room == "ONLINE")
         allowed, pref_score = check_lecturer_preferences(lect, day, start, end, strict_mode=False, is_online=is_online)
+        # Hard block: skip insertion if placement violates unavailability (including ONLINE)
+        if not allowed:
+            print(f"  ❌ Skipped {sec.get('course_name')} {sec.get('section_label')} for {lect} on {day} {start}-{end} (blocked by preferences)")
+            continue
         match_quality = get_match_quality(pref_score)
         
         doc = {
@@ -9432,7 +9464,7 @@ def schedule_new_sections_only(section_ids, sections_to_schedule=None):
         """
         prefs = get_lecturer_preferences(lecturer_name)
         
-        # Check unavailable_time_ranges (HARD constraint for physical, soft for online)
+        # Check unavailable_time_ranges (HARD constraint for both physical and online)
         unavailable_ranges = prefs.get("unavailable_time_ranges", [])
         for block in unavailable_ranges:
             block_day = block.get('day', '*')
@@ -9440,8 +9472,7 @@ def schedule_new_sections_only(section_ids, sections_to_schedule=None):
             block_end = block.get('end', '23:59')
             if block_day == '*' or block_day == day:
                 if times_overlap(start, end, block_start, block_end):
-                    if not is_online:
-                        return False, 0  # Hard violation for physical classes
+                    return False, 0  # Hard violation for any class type (including ONLINE)
         
         # Check available_days (SOFT constraint - prefers available days but allows others as fallback)
         available_days = prefs.get("available_days", [])
