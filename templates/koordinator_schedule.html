@@ -32,6 +32,7 @@
                         <th>Dosen</th>
                         <th>Kesesuaian</th>
                         <th>Score</th>
+                        <th>Probabilitas</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -59,6 +60,16 @@
                             {% endif %}
                         </td>
                         <td class="text-center"><span class="score-badge">{{ slot.preference_score|default(50) }}%</span></td>
+                        <td class="text-center">
+                            {% set prob = slot.probability|default(50) %}
+                            {% if prob >= 80 %}
+                                <span class="probability-badge probability-high" title="Kemungkinan sangat tinggi">{{ prob }}%</span>
+                            {% elif prob >= 60 %}
+                                <span class="probability-badge probability-medium" title="Kemungkinan sedang">{{ prob }}%</span>
+                            {% else %}
+                                <span class="probability-badge probability-low" title="Kemungkinan rendah">{{ prob }}%</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endif %}
                 {% endfor %}
@@ -93,5 +104,32 @@ function searchScheduleTable() {
     });
 }
 </script>
+
+<style>
+.probability-badge {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    display: inline-block;
+    min-width: 50px;
+    text-align: center;
+}
+
+.probability-high {
+    background: #c8e6c9;
+    color: #1b5e20;
+}
+
+.probability-medium {
+    background: #fff9c4;
+    color: #f57f17;
+}
+
+.probability-low {
+    background: #ffccbc;
+    color: #d84315;
+}
+</style>
 
 {% endblock %}
