@@ -370,6 +370,7 @@ try:
     unavailability_reports_collection = db["unavailability_reports"]
     sections_collection = db["sections"]
     active_students_collection = db["active_students"]
+    removed_sections_collection = db["removed_sections"]  # Log section yang dihapus
     # New collection for GA-generated sections (before time/room scheduling)
     try:
         sections_collection = db["sections"]
@@ -386,6 +387,7 @@ except Exception as e:
     unavailability_reports_collection = db.unavailability_reports
     sections_collection = getattr(db, "sections", None)
     active_students_collection = getattr(db, "active_students", None)
+    removed_sections_collection = getattr(db, "removed_sections", None)
 
 
 # try:
