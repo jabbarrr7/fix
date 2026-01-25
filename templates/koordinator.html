@@ -1,3 +1,10 @@
+        <!-- <a href="/koordinator/unavailability_requests" class="btn btn-warning">
+            📋 Reschedule Requests
+            {% if pending_reschedule_count and pending_reschedule_count > 0 %}
+                <span style="background:#d32f2f; color:#fff; padding:2px 8px; border-radius:12px; font-size:12px; margin-left:6px;">{{ pending_reschedule_count }}</span>
+            {% endif %}
+        </a>
+        <button type="button" class="btn btn-success" onclick="document.getElementById('addSectionModal').style.display='block'">➕ Tambah Section</button> -->
 {% extends "base.html" %}
 {% block content %}
 
@@ -61,15 +68,8 @@
             <button type="submit" class="btn btn-primary">🔄 Generate Jadwal (OR-Tools)</button>
         </form>
         <a class="btn btn-info" href="/koordinator/student_count">👥 Isi Jumlah Mahasiswa</a>
-        <button type="button" class="btn btn-success" onclick="document.getElementById('addSectionModal').style.display='block'">➕ Tambah Section</button>
         <button type="button" class="btn btn-danger" onclick="document.getElementById('deleteSectionModal').style.display='block'">🗑️ Hapus Section</button>
         <a href="/koordinator_schedule" class="btn btn-ghost">📅 Lihat Jadwal Lengkap</a>
-        <a href="/koordinator/unavailability_requests" class="btn btn-warning">
-            📋 Reschedule Requests
-            {% if pending_reschedule_count and pending_reschedule_count > 0 %}
-                <span style="background:#d32f2f; color:#fff; padding:2px 8px; border-radius:12px; font-size:12px; margin-left:6px;">{{ pending_reschedule_count }}</span>
-            {% endif %}
-        </a>
     </div>
 </div>
 
