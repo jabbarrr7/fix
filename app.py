@@ -679,55 +679,17 @@ def _times_overlap(s1, e1, s2, e2):
 # Fallback: Jika koneksi gagal, gunakan DummyDB (prevent app crash)
 # ============================================================================
 
-# try:
-#     client = MongoClient(
-#         "mongodb+srv://salamull1005:Jabbar1005@schedules.fb8isvj.mongodb.net/?appName=schedules",
-#         tls=True,
-#         tlsAllowInvalidCertificates=True,
-#         serverSelectionTimeoutMS=10000,
-#         connectTimeoutMS=10000,
-#         socketTimeoutMS=10000
-#     )
-#     client.server_info()  # Test connection immediately
-#     db = client["schedule_db"]
-#     schedules_collection = db["schedules"]
-#     users_collection = db["users"]
-#     courses_collection = db["courses"]
-#     unavailability_reports_collection = db["unavailability_reports"]
-#     sections_collection = db["sections"]
-#     active_students_collection = db["active_students"]
-#     removed_sections_collection = db["removed_sections"]  # Log section yang dihapus
-#     # New collection for GA-generated sections (before time/room scheduling)
-#     try:
-#         sections_collection = db["sections"]
-#     except Exception:
-#         sections_collection = None
-#     print("MongoDB Atlas connection: SUCCESS")
-# except Exception as e:
-#     print(f"MongoDB Atlas connection: FAILED\n{e}")
-#     # Provide safe dummy objects so the app routes won't crash when DB is down.
-#     db = DummyDB()
-#     schedules_collection = db.schedules
-#     users_collection = db.users
-#     courses_collection = db.courses
-#     unavailability_reports_collection = db.unavailability_reports
-#     sections_collection = getattr(db, "sections", None)
-#     active_students_collection = getattr(db, "active_students", None)
-#     removed_sections_collection = getattr(db, "removed_sections", None)
-
-
 try:
-    # KONEKSI KE MONGODB LOCAL
     client = MongoClient(
-        "mongodb://localhost:27017",
-        serverSelectionTimeoutMS=5000
+        "mongodb+srv://salamull1005:Jabbar1005@schedules.fb8isvj.mongodb.net/?appName=schedules",
+        tls=True,
+        tlsAllowInvalidCertificates=True,
+        serverSelectionTimeoutMS=10000,
+        connectTimeoutMS=10000,
+        socketTimeoutMS=10000
     )
-
-    # Test koneksi
-    client.admin.command("ping")
-
+    client.server_info()  # Test connection immediately
     db = client["schedule_db"]
-
     schedules_collection = db["schedules"]
     users_collection = db["users"]
     courses_collection = db["courses"]
@@ -735,13 +697,15 @@ try:
     sections_collection = db["sections"]
     active_students_collection = db["active_students"]
     removed_sections_collection = db["removed_sections"]  # Log section yang dihapus
-
-    print("MongoDB LOCAL connection: SUCCESS")
-
+    # New collection for GA-generated sections (before time/room scheduling)
+    try:
+        sections_collection = db["sections"]
+    except Exception:
+        sections_collection = None
+    print("MongoDB Atlas connection: SUCCESS")
 except Exception as e:
-    print(f"MongoDB LOCAL connection: FAILED\n{e}")
-
-    # Dummy fallback (biar app tidak crash)
+    print(f"MongoDB Atlas connection: FAILED\n{e}")
+    # Provide safe dummy objects so the app routes won't crash when DB is down.
     db = DummyDB()
     schedules_collection = db.schedules
     users_collection = db.users
@@ -750,6 +714,42 @@ except Exception as e:
     sections_collection = getattr(db, "sections", None)
     active_students_collection = getattr(db, "active_students", None)
     removed_sections_collection = getattr(db, "removed_sections", None)
+
+
+# try:
+#     # KONEKSI KE MONGODB LOCAL
+#     client = MongoClient(
+#         "mongodb://localhost:27017",
+#         serverSelectionTimeoutMS=5000
+#     )
+
+#     # Test koneksi
+#     client.admin.command("ping")
+
+#     db = client["schedule_db"]
+
+#     schedules_collection = db["schedules"]
+#     users_collection = db["users"]
+#     courses_collection = db["courses"]
+#     unavailability_reports_collection = db["unavailability_reports"]
+#     sections_collection = db["sections"]
+#     active_students_collection = db["active_students"]
+#     removed_sections_collection = db["removed_sections"]  # Log section yang dihapus
+
+#     print("MongoDB LOCAL connection: SUCCESS")
+
+# except Exception as e:
+#     print(f"MongoDB LOCAL connection: FAILED\n{e}")
+
+#     # Dummy fallback (biar app tidak crash)
+#     db = DummyDB()
+#     schedules_collection = db.schedules
+#     users_collection = db.users
+#     courses_collection = db.courses
+#     unavailability_reports_collection = db.unavailability_reports
+#     sections_collection = getattr(db, "sections", None)
+#     active_students_collection = getattr(db, "active_students", None)
+#     removed_sections_collection = getattr(db, "removed_sections", None)
 
 
 # ------------------------------
@@ -11285,3 +11285,4 @@ def schedule_analytics():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
