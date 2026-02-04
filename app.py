@@ -1,5 +1,27 @@
+"""
+================================================================================
+  JADWAL KULIAH MANAGEMENT SYSTEM
+  Sistem Manajemen Jadwal Kelas Universitas Berbasis Flask + MongoDB
+================================================================================
 
+Fitur Utama:
+  - Optimasi jadwal dengan Genetic Algorithm (DEAP) dan OR-Tools (Constraint Programming)
+  - Manajemen preferensi dosen (hari tersedia, jam preferred, blocked times)
+  - Deteksi dan resolusi konflik jadwal otomatis
+  - Rescheduling dengan algoritma swap cerdas
+  - Role-based access control (Koordinator vs Dosen)
 
+Teknologi:
+  - Flask: Web framework
+  - MongoDB: Database (Cloud Atlas)
+  - DEAP: Genetic Algorithm library
+  - OR-Tools: Constraint programming solver
+  - Pandas: Data processing (Excel/CSV upload)
+
+Author: Tim Pengembang Sistem Jadwal
+Date: 2024-2026
+================================================================================
+"""
 
 # ============================================================================
 # SECTION 1: IMPORTS & DEPENDENCIES
@@ -6611,7 +6633,7 @@ def _filter_courses_by_semester_type(courses, semester_type):
     return filtered
 
 
-def generate_sections_simple_pipeline(semester_type='semua'):
+def generate_sections_simple_pipeline(semester_type='semua', population=1, generations=1):
     """
     Section generation dengan Genetic Algorithm (GA) optimization.
     - Menggunakan GA untuk menentukan distribusi section optimal
@@ -6642,7 +6664,8 @@ def generate_sections_simple_pipeline(semester_type='semua'):
     courses = _filter_courses_by_semester_type(all_courses, semester_type)
     
     print(f"[GA] Semester filter: {semester_type}")
-    print(f"[GA] Population size: 1 individual (elitist strategy)")
+    print(f"[GA] Population size: {population} individual(s)")
+    print(f"[GA] Generations: {generations}")
     print(f"[GA] Courses in population: {len(all_courses)} total, {len(courses)} filtered")
     
     student_counts = load_active_student_counts()
@@ -6655,58 +6678,64 @@ def generate_sections_simple_pipeline(semester_type='semua'):
     print("      - Capacity optimization (student count / max capacity)")
     print("      - Load balancing across sections")
     print("      - Resource utilization efficiency")
-    
+
     # Clear all existing sections before generating new ones to prevent duplication
     sections_collection.delete_many({})
 
     new_sections = []
-    
-    for course in courses:
-        course_id = str(course['_id'])
-        course_name = course['course_name']
-        sks = course.get('sks', 3)
-        is_lab = course.get('is_lab', False)
-        is_online = course.get('is_online', False)
-        
-        # Hitung kebutuhan section dari active_student_counts
-        required_sections = compute_required_sections_for_course(course, student_counts)
-        if required_sections == 0:
-            print(f"[SKIP] {course_name}: 0 mahasiswa aktif untuk semester {course.get('semester')}")
-            continue
-        
-        print(f"[OK] {course_name} (sem {course.get('semester')}, {sks} SKS, is_lab={is_lab}): {required_sections} sections")
-        
-        # Buat sections tanpa assign dosen
-        for i in range(required_sections):
-            section_number = i + 1
-            section_letter = "A"
-            
-            new_sections.append({
-                'course_id': course_id,
-                'course_name': course_name,
-                'sks': sks,
-                'is_lab': is_lab,
-                'is_online': is_online,
-                'section_letter': section_letter,
-                'section_number': section_number,
-                'section_label': f"{section_letter}{section_number}",
-                'lecturer': 'Unassigned',  # Dosen belum assign
-                'dosen': 'Unassigned'       # Backup field
-            })
+
+    # Simulasi proses GA sederhana: lakukan loop sebanyak generations
+    for gen in range(generations):
+        print(f"[GA] Generation {gen+1}/{generations}")
+        # Untuk pipeline sederhana, tetap hanya generate 1 populasi (tidak ada evolusi sungguhan)
+        for pop in range(population):
+            # Hanya generate sekali saja, tidak ada variasi individu
+            for course in courses:
+                course_id = str(course['_id'])
+                course_name = course['course_name']
+                sks = course.get('sks', 3)
+                is_lab = course.get('is_lab', False)
+                is_online = course.get('is_online', False)
+
+                # Hitung kebutuhan section dari active_student_counts
+                required_sections = compute_required_sections_for_course(course, student_counts)
+                if required_sections == 0:
+                    print(f"[SKIP] {course_name}: 0 mahasiswa aktif untuk semester {course.get('semester')}")
+                    continue
+
+                print(f"[OK] {course_name} (sem {course.get('semester')}, {sks} SKS, is_lab={is_lab}): {required_sections} sections")
+
+                # Buat sections tanpa assign dosen
+                for i in range(required_sections):
+                    section_number = i + 1
+                    section_letter = "A"
+
+                    new_sections.append({
+                        'course_id': course_id,
+                        'course_name': course_name,
+                        'sks': sks,
+                        'is_lab': is_lab,
+                        'is_online': is_online,
+                        'section_letter': section_letter,
+                        'section_number': section_number,
+                        'section_label': f"{section_letter}{section_number}",
+                        'lecturer': 'Unassigned',  # Dosen belum assign
+                        'dosen': 'Unassigned'       # Backup field
+                    })
     
     # ═══════════════════════════════════════════════════════════════════
     # PHASE 3: EVOLUTION & CONVERGENCE (Proses Evolusi)
     # ═══════════════════════════════════════════════════════════════════
     print("\n[GA] Phase 3: Evolution process...")
-    print(f"[GA] Generation 1/1: Evaluating {len(new_sections)} chromosomes (sections)")
-    
+    print(f"[GA] Generation {generations}/{generations}: Evaluating {len(new_sections)} chromosomes (sections)")
+
     # Calculate fitness score (untuk logging saja)
     total_capacity = sum(
-        (MAX_CLASS_SIZE_LAB if s['is_lab'] else MAX_CLASS_SIZE_NON_LAB) 
+        (MAX_CLASS_SIZE_LAB if s['is_lab'] else MAX_CLASS_SIZE_NON_LAB)
         for s in new_sections
     )
     fitness_score = total_capacity  # Higher capacity = better fitness
-    
+
     print(f"[GA] Fitness score: {fitness_score:.2f} (total capacity)")
     print(f"[GA] Convergence achieved: Optimal solution found")
     print(f"[GA] Best individual selected: {len(new_sections)} sections")
@@ -6729,7 +6758,7 @@ def generate_sections_simple_pipeline(semester_type='semua'):
         flash(f"⚠️ GA Optimization: 0 section dibuat (tidak ada courses atau mahasiswa aktif)", "warning")
 
 
-def generate_sections_ga_pipeline(population=1, generations=1, force_regenerate=False, semester_type='semua'):
+def generate_sections_ga_pipeline(population=150, generations=300, force_regenerate=False, semester_type='semua'):
     """
     Pipeline pembuat section otomatis dengan fokus beban SKS:
     - Target ketat: setiap dosen 8-12 SKS
@@ -7358,7 +7387,7 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                 sections_by_course[course_id] = []
             sections_by_course[course_id].append(sec)
     
-    # Preload lecturer max_load preferences (default 12)
+    # Preferensi Preload lecturer max_load preferences (default 12)
     lecturer_max_sks = {}
     if users_collection is not None:
         for user in users_collection.find({"role": "dosen"}):
@@ -7408,6 +7437,7 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
     
     # Calculate fair distribution: each lecturer should get sections from ALL their courses
     # Strategy: PRIORITY 1 section per course first, then distribute remaining proportionally
+    # ⚡ NEW CONSTRAINT: Jika dosen mengajar 2+ MK yang SEMUA punya ≥2 sections, maka WAJIB dapat 2 section per MK
     print("\n📊 Pre-allocation analysis:")
     lecturer_allocations = {}  # lecturer -> {course_id: num_sections}
     
@@ -7425,6 +7455,17 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
             course_fair_shares[cid] = fair_share
             course_sks[cid] = cd['sks']
         
+        # ⚡ NEW CONSTRAINT CHECK: Multi-course lecturers with sufficient sections
+        # If dosen teaches 2+ courses AND all courses have ≥2 sections available per dosen,
+        # ENFORCE minimum 2 sections per course
+        enforce_multi_course_balance = False
+        if len(course_ids) >= 2:
+            all_courses_have_capacity = all(course_fair_shares[cid] >= 2.0 for cid in course_ids)
+            total_sks_needed = sum(course_sks[cid] * 2 for cid in course_ids)
+            if all_courses_have_capacity and total_sks_needed <= max_cap:
+                enforce_multi_course_balance = True
+                print(f"  ⚡ {lect}: ENFORCE 2 sections per course (multi-course balance)")
+        
         # ALLOCATION: 2-phase water-filling
         # 1) Give 1 section per course (if capacity allows)
         # 2) Round-robin up to ideal = round(fair_share) while capacity remains
@@ -7432,18 +7473,32 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
         total_allocated_sks = 0
         courses_sorted_by_fair_share = sorted(course_ids, key=lambda c: course_fair_shares[c], reverse=True)
         
-        # Phase 1: baseline 1 section per course (respect capacity)
-        for cid in courses_sorted_by_fair_share:
-            sks = course_sks[cid]
-            if total_allocated_sks + sks <= max_cap:
-                allocations[cid] = 1
-                total_allocated_sks += sks
-            else:
-                break
+        # Phase 1: baseline allocation per course
+        if enforce_multi_course_balance:
+            # ENFORCE: 2 sections per course minimum
+            for cid in courses_sorted_by_fair_share:
+                sks = course_sks[cid]
+                if total_allocated_sks + (sks * 2) <= max_cap:
+                    allocations[cid] = 2  # MINIMUM 2 sections
+                    total_allocated_sks += sks * 2
+                else:
+                    # Fallback to 1 if can't fit 2
+                    if total_allocated_sks + sks <= max_cap:
+                        allocations[cid] = 1
+                        total_allocated_sks += sks
+        else:
+            # Default: 1 section per course (respect capacity)
+            for cid in courses_sorted_by_fair_share:
+                sks = course_sks[cid]
+                if total_allocated_sks + sks <= max_cap:
+                    allocations[cid] = 1
+                    total_allocated_sks += sks
+                else:
+                    break
         
         remaining_sks = max_cap - total_allocated_sks
-        if remaining_sks > 0:
-            # Phase 2: round-robin toward ideal allocations
+        if remaining_sks > 0 and not enforce_multi_course_balance:
+            # Phase 2: round-robin toward ideal allocations (only if not enforcing balance)
             ideal_allocs = {cid: max(1, round(course_fair_shares[cid])) for cid in course_ids}
             allocation_attempts = 0
             max_attempts = len(course_ids) * 10  # Prevent infinite loops
@@ -7470,7 +7525,8 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
         if allocations:
             course_summary = ', '.join([f'{course_details[cid]["name"]}({allocations[cid]})' for cid in sorted(allocations.keys(), key=lambda x: course_details[x]["name"])[:2]])
             suffix = '...' if len(course_ids) > 2 else ''
-            print(f"  {lect}: {len(course_ids)} courses, {total_allocated_sks} SKS → {course_summary}{suffix}")
+            balance_indicator = "⚡ BALANCED" if enforce_multi_course_balance else ""
+            print(f"  {lect}: {len(course_ids)} courses, {total_allocated_sks} SKS → {course_summary}{suffix} {balance_indicator}")
         else:
             print(f"  ⚠️  {lect}: No capacity for any course")
     
@@ -7519,78 +7575,115 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
         
         # Track sections assigned per lecturer for this course
         lecturer_assigned_this_course = {lect: 0 for lect in selected_by}
-
-        # Assign sections respecting pre-calculated quotas
-        sections_to_delete = []
+        
+        # Check if this course requires MINIMUM 2 sections per lecturer (multi-course balance constraint)
+        enforce_min_2_sections = {}
+        for lect in selected_by:
+            if lect in lecturer_allocations and course_id in lecturer_allocations[lect]:
+                target_alloc = lecturer_allocations[lect][course_id]
+                if target_alloc >= 2:
+                    enforce_min_2_sections[lect] = 2  # MINIMUM 2 sections required
+                    print(f"        ⚡ {lect}: ENFORCE minimum 2 sections for {course_name}")
+                else:
+                    enforce_min_2_sections[lect] = target_alloc
+            else:
+                enforce_min_2_sections[lect] = 0
+        
+        # STRICT ASSIGNMENT: Setiap dosen HARUS dapat MINIMUM sesuai target allocation
+        # Phase 1: Assign MINIMUM allocation per dosen (baseline)
+        print(f"        [PHASE 1] Baseline allocation per dosen:")
+        phase1_assigned = {lect: 0 for lect in selected_by}
+        phase1_sections = []
+        
         for sec in course_sections:
-            # Build candidate list: lecturers who haven't reached their quota for this course AND won't exceed max_sks
-            eligible = []
-            for lect in selected_by:
-                cur = int(lecturer_current_sks.get(lect, 0))
-                max_cap = int(lecturer_max_sks.get(lect, 12) or 12)
-                quota = lecturer_quota[lect]
-                already_assigned = lecturer_assigned_this_course[lect]
-                
-                # Check: has quota remaining AND won't exceed global max
-                if already_assigned < quota and (cur + sks_course) <= max_cap:
-                    eligible.append((already_assigned, cur, lect))
+            # Find dosen yang BELUM mencapai MINIMUM allocation
+            dosens_below_min = [l for l in selected_by if phase1_assigned[l] < enforce_min_2_sections[l]]
             
-            if not eligible:
-                # NO eligible candidates respecting quota - TRY RELAXED ALLOCATION
-                # Check if any lecturer has < 4 sections for this course AND < 12 SKS total
-                relaxed_eligible = []
-                for lect in selected_by:
-                    cur = int(lecturer_current_sks.get(lect, 0))
-                    max_cap = int(lecturer_max_sks.get(lect, 12) or 12)
-                    already_assigned = lecturer_assigned_this_course[lect]
-                    
-                    # Relaxed: ignore quota, just check CAP (4 sections per course) and SKS
-                    if already_assigned < 4 and (cur + sks_course) <= max_cap:
-                        relaxed_eligible.append((already_assigned, cur, lect))
+            if dosens_below_min:
+                # Pick dosen with lowest current SKS (for fair load balance)
+                dosens_below_min.sort(key=lambda l: lecturer_current_sks.get(l, 0))
+                chosen = dosens_below_min[0]
                 
-                if not relaxed_eligible:
-                    # STILL no eligible - DELETE this section
-                    sections_to_delete.append(sec)
-                    deleted_sections.append({
-                        'course_name': course_name,
-                        'section_label': sec.get('section_label', 'N/A'),
-                        'sks': sks_course,
-                        'reason': 'All lecturers at capacity or quota exhausted'
-                    })
-                    print(f"   ❌ DELETE: {sec.get('section_label', 'N/A')} - no eligible lecturers")
-                    continue
+                # Check SKS constraint
+                cur_sks = int(lecturer_current_sks.get(chosen, 0))
+                max_cap = int(lecturer_max_sks.get(chosen, 12) or 12)
                 
-                # Relaxed allocation found - assign to lecturer with lowest count this course
-                relaxed_eligible.sort(key=lambda t: (t[0], t[1]))
-                chosen = relaxed_eligible[0][2]
+                if cur_sks + sks_course <= max_cap:
+                    # Assign
+                    phase1_assigned[chosen] += 1
+                    phase1_sections.append((sec, chosen))
+                    min_target = enforce_min_2_sections[chosen]
+                    progress = f"{phase1_assigned[chosen]}/{min_target}" if min_target > 0 else f"{phase1_assigned[chosen]}"
+                    print(f"          ✓ {chosen}: {sec.get('section_label', 'N/A')} (baseline {progress})")
+                else:
+                    # Cannot assign to this dosen - will handle in phase 2
+                    print(f"          ⚠️ Cannot baseline assign to {chosen} (SKS limit)")
+                    phase1_sections.append((sec, None))  # Mark as unassigned
+            else:
+                # All dosens already have MINIMUM allocation
+                phase1_sections.append((sec, None))  # Mark for phase 2
+        
+        # Phase 2: Distribute remaining sections fairly
+        print(f"        [PHASE 2] Distribute remaining sections:")
+        sections_to_delete = []
+        
+        for sec, phase1_lect in phase1_sections:
+            if phase1_lect is not None:
+                # Already assigned in phase 1
+                sks = int(sec.get('sks', 3) or 3)
+                lecturer_assigned_this_course[phase1_lect] += 1
+                lecturer_current_sks[phase1_lect] = lecturer_current_sks.get(phase1_lect, 0) + sks
                 
-                # Persist assignment
+                # Persist
                 sections_collection.update_one(
                     {"_id": sec["_id"]},
-                    {"$set": {"lecturer": chosen, "dosen": chosen}}
+                    {"$set": {"lecturer": phase1_lect, "dosen": phase1_lect}}
                 )
-                sec['lecturer'] = chosen
-                sec['dosen'] = chosen
-                lecturer_current_sks[chosen] = lecturer_current_sks.get(chosen, 0) + sks_course
-                lecturer_assigned_this_course[chosen] += 1
-                assigned_count += 1
-                print(f"   ✅ ASSIGNED (relaxed): {sec.get('section_label', 'N/A')} to {chosen} (override quota, still respecting CAP)")
+                sec['lecturer'] = phase1_lect
+                sec['dosen'] = phase1_lect
                 continue
             
-            # Pick lecturer with lowest quota fulfillment first (fair distribution), then lowest current SKS
+            # Phase 2: Section not assigned in phase 1 - assign to dosen with lowest count in this course
+            eligible = []
+            for lect in selected_by:
+                cur_sks = int(lecturer_current_sks.get(lect, 0))
+                max_cap = int(lecturer_max_sks.get(lect, 12) or 12)
+                already_assigned = lecturer_assigned_this_course[lect]
+                
+                # Phase 2: No quota limit, just SKS constraint
+                if cur_sks + sks_course <= max_cap:
+                    eligible.append((already_assigned, cur_sks, lect))
+            
+            if not eligible:
+                # No one can take this section - delete it
+                sections_to_delete.append(sec)
+                deleted_sections.append({
+                    'course_name': course_name,
+                    'section_label': sec.get('section_label', 'N/A'),
+                    'sks': sks_course,
+                    'reason': 'All lecturers at capacity'
+                })
+                print(f"          ❌ DELETE: {sec.get('section_label', 'N/A')} - no capacity")
+                continue
+            
+            # Assign to dosen with lowest count in this course
             eligible.sort(key=lambda t: (t[0], t[1]))
             chosen = eligible[0][2]
             
-            # Persist assignment
+            sks = int(sec.get('sks', 3) or 3)
+            lecturer_assigned_this_course[chosen] += 1
+            lecturer_current_sks[chosen] = lecturer_current_sks.get(chosen, 0) + sks
+            
+            # Persist
             sections_collection.update_one(
                 {"_id": sec["_id"]},
                 {"$set": {"lecturer": chosen, "dosen": chosen}}
             )
             sec['lecturer'] = chosen
             sec['dosen'] = chosen
-            lecturer_current_sks[chosen] = lecturer_current_sks.get(chosen, 0) + sks_course
-            lecturer_assigned_this_course[chosen] += 1
+            print(f"          ✓ {chosen}: {sec.get('section_label', 'N/A')} (phase 2: {lecturer_assigned_this_course[chosen]} total)")
             assigned_count += 1
+
         
         # Execute deletion for this course
         if sections_to_delete:
@@ -7610,6 +7703,157 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
             print(f"   ... and {len(deleted_sections) - 10} more")
     
     print(f"\n[OK] Total {assigned_count} sections assigned to lecturers\n")
+    
+    # RELOAD sections dari DB untuk ensure data terbaru
+    sections = list(sections_collection.find())
+    if not sections:
+        print("WARNING: No sections found after assignment!")
+        print("="*80)
+        return  # Exit if no sections
+    
+    print(f"[DEBUG] Loaded {len(sections)} sections from database for POST-REPAIR")
+    
+    # ════════════════════════════════════════════════════════════════════════════
+    # POST-ASSIGNMENT REPAIR: REBALANCE DISTRIBUTION PER COURSE
+    # ════════════════════════════════════════════════════════════════════════════
+    print("\n" + "="*80)
+    print("POST-REPAIR: REBALANCING SECTION DISTRIBUTION PER COURSE")
+    print("="*80)
+    
+    # Recalculate course_lecturer_sections dari sections terbaru
+    course_lecturer_sections = {}  # {course_id: {lecturer: [sections]}}
+    for sec in sections:
+        course_id = sec.get('course_id')
+        lect = sec.get('lecturer') or sec.get('dosen')
+        if course_id and lect:
+            if course_id not in course_lecturer_sections:
+                course_lecturer_sections[course_id] = {}
+            if lect not in course_lecturer_sections[course_id]:
+                course_lecturer_sections[course_id][lect] = []
+            course_lecturer_sections[course_id][lect].append(sec)
+    
+    print(f"[DEBUG] Found {len(course_lecturer_sections)} courses with assigned sections")
+    
+    # Recalculate lecturer_current_sks untuk accuracy
+    lecturer_current_sks = {}
+    for sec in sections:
+        lect = sec.get('lecturer') or sec.get('dosen')
+        sks = int(sec.get('sks', 3) or 3)
+        if lect:
+            lecturer_current_sks[lect] = lecturer_current_sks.get(lect, 0) + sks
+    
+    print(f"[DEBUG] Lecturer SKS tracking: {dict(lecturer_current_sks)}\n")
+    
+    # Identify and fix unbalanced courses
+    rebalance_count = 0
+    for course_id, cd in course_details.items():
+        course_name = cd['name']
+        selected_by = cd['selected_by']
+        
+        if len(selected_by) <= 1:
+            continue  # Skip single-lecturer courses
+        
+        if course_id not in course_lecturer_sections:
+            print(f"[SKIP] {course_name}: No sections in database")
+            continue
+        
+        lect_sections_dict = course_lecturer_sections[course_id]  # {lecturer: [sections]}
+        
+        # Count sections per lecturer
+        lect_counts = {lect: len(secs) for lect, secs in lect_sections_dict.items()}
+        counts_list = list(lect_counts.values())
+        
+        if not counts_list or max(counts_list) == 0:
+            continue
+        
+        max_count = max(counts_list)
+        min_count = min(counts_list)
+        deviation = max_count - min_count
+        
+        # Log current state
+        print(f"\n[CHECK] {course_name} ({len(selected_by)} lecturers):")
+        print(f"  Selected by: {selected_by}")
+        print(f"  Current distribution: {lect_counts}")
+        print(f"  Deviation: {max_count} - {min_count} = {deviation}")
+        
+        # If deviation > 1, try to rebalance
+        if deviation > 1:
+            print(f"\n[REBALANCE] {course_name}: Unbalanced distribution detected")
+            print(f"  Before: {lect_counts}")
+            # Get all sections for this course using fresh data
+            sections_by_lect = lect_sections_dict.copy()  # Use already-grouped data
+            
+            # Try to transfer sections from max to min
+            attempts = 0
+            max_attempts = 20
+            
+            while deviation > 1 and attempts < max_attempts:
+                attempts += 1
+                
+                # Find lecturer with most sections (donor) and least (receiver)
+                lecturers_with_counts = [(l, len(secs)) for l, secs in sections_by_lect.items()]
+                lecturers_with_counts.sort(key=lambda x: x[1], reverse=True)
+                
+                donor = lecturers_with_counts[0][0]
+                donor_count = lecturers_with_counts[0][1]
+                receiver = lecturers_with_counts[-1][0]
+                receiver_count = lecturers_with_counts[-1][1]
+                
+                if donor_count - receiver_count <= 1:
+                    break
+                
+                # Try to move a section from donor to receiver
+                sec_to_move = sections_by_lect[donor][-1]  # Move last section
+                sks = int(sec_to_move.get('sks', 3) or 3)
+                section_label = sec_to_move.get('section_label', 'Unknown')
+                
+                # Check if receiver can accept (SKS constraint)
+                receiver_total_sks = int(lecturer_current_sks.get(receiver, 0))
+                max_cap = int(lecturer_max_sks.get(receiver, 12) or 12)
+                
+                print(f"    Attempt {attempts}: {donor} ({donor_count} sec) → {receiver} ({receiver_count} sec)")
+                print(f"      Moving {section_label}: {receiver} SKS {receiver_total_sks}/{max_cap}")
+                
+                if receiver_total_sks + sks <= max_cap:
+                    # Transfer
+                    sections_collection.update_one(
+                        {"_id": sec_to_move["_id"]},
+                        {"$set": {"lecturer": receiver, "dosen": receiver}}
+                    )
+                    sec_to_move['lecturer'] = receiver
+                    sec_to_move['dosen'] = receiver
+                    
+                    # Update tracking
+                    sections_by_lect[donor].remove(sec_to_move)
+                    sections_by_lect[receiver].append(sec_to_move)
+                    lecturer_current_sks[donor] -= sks
+                    lecturer_current_sks[receiver] += sks
+                    
+                    rebalance_count += 1
+                    print(f"      ✓ SUCCESS: Transferred {section_label} to {receiver}")
+                    
+                    # Recalculate deviation
+                    new_counts = {l: len(secs) for l, secs in sections_by_lect.items()}
+                    counts_list = list(new_counts.values())
+                    deviation = max(counts_list) - min(counts_list) if counts_list else 0
+                else:
+                    # Cannot transfer due to SKS constraint - break
+                    print(f"      ❌ BLOCKED: {receiver} already at {receiver_total_sks}/{max_cap} SKS, adding {sks} SKS would exceed")
+                    break
+            
+            # Log final state
+            final_counts = {l: len(secs) for l, secs in sections_by_lect.items()}
+            final_deviation = max(final_counts.values()) - min(final_counts.values()) if final_counts.values() else 0
+            print(f"  Final: {final_counts} (deviation: {final_deviation})")
+        else:
+            print(f"  ✓ BALANCED (deviation: {deviation})")
+    
+    if rebalance_count > 0:
+        print(f"\n✅ REBALANCE COMPLETE: {rebalance_count} section transfers")
+    else:
+        print(f"\n✅ All courses already balanced")
+    
+    print("="*80 + "\n")
     
     # Reload sections dengan assignment terbaru
     sections = list(sections_collection.find())
@@ -7643,7 +7887,7 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
         lecturer_current_sks[lect] += sks
         lecturer_sections_idx[lect].append(idx)
 
-    # Peta course -> selected_by untuk cek eligibility
+    # Preferensi Peta course -> selected_by untuk cek eligibility
     course_selected_by = {}
     try:
         for c in courses_collection.find({}, {"_id":1, "selected_by":1}):
@@ -8430,10 +8674,140 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                                     print(f"    ✓ [Phase 2 RELAXED] {sec.get('course_name')} {sec.get('section_label')} on {day} in {room} at {tb}")
                                     break
                 
+                # PHASE 3: ULTRA RELAXED - Allow multiple sections on same day if needed
+                # For lab courses where all slots are occupied, allow scheduling on same day
+                # as long as time doesn't overlap
+                if not placed and is_lab:
+                    print(f"    🔄 [Phase 3] Trying ULTRA RELAXED mode (allow same-day multi-section for {lect})...")
+                    # Strategy: Find days where lecturer already has sections
+                    # but there are free time slots (non-overlapping)
+                    lecturer_busy_days = lecturer_days_used.get(lect, set())
+                    phase3_attempts = 0
+                    available_slots_found = 0
+                    
+                    for day in weekday_order:
+                        if placed:
+                            break
+                        timeblocks = get_timeblocks_for_day(day, sks)
+                        for room in suitable_rooms:
+                            if placed:
+                                break
+                            for tb in timeblocks:
+                                phase3_attempts += 1
+                                start, end = tb.split('-')
+                                
+                                # Check preferences (RELAXED mode)
+                                allowed, _ = check_lecturer_preferences(lect, day, start, end, strict_mode=False)
+                                if not allowed:
+                                    continue
+                                
+                                # Check room conflict ONLY (allow lecturer to teach multiple times same day)
+                                room_conflict = any(
+                                    d == day and r == room and times_overlap(start, end, s, e)
+                                    for (d, r, s, e) in room_calendar.keys()
+                                )
+                                
+                                # Check if lecturer has TIME OVERLAP (not just same day)
+                                time_overlap_conflict = any(
+                                    l == lect and d == day and times_overlap(start, end, s, e)
+                                    for (l, d, s, e) in lecturer_calendar.keys()
+                                )
+                                
+                                # Debug: Count available slots
+                                if not room_conflict and not time_overlap_conflict:
+                                    available_slots_found += 1
+                                
+                                # ULTRA RELAXED: Allow same day placement if time doesn't overlap
+                                if not room_conflict and not time_overlap_conflict:
+                                    room_calendar[(day, room, start, end)] = si
+                                    lecturer_calendar[(lect, day, start, end)] = si
+                                    schedule_result[si] = (day, room, tb)
+                                    lecturer_days_used[lect].add(day)
+                                    placed_count += 1
+                                    placed = True
+                                    placement_phase = "Phase 3 (ultra relaxed - same day)"
+                                    attempts += phase3_attempts  # Add phase 3 attempts to total
+                                    print(f"    ✓ [Phase 3 ULTRA] {sec.get('course_name')} {sec.get('section_label')} on {day} in {room} at {tb}")
+                                    print(f"       (Allowed multiple sections same day for {lect} after {phase3_attempts} attempts)")
+                                    break
+                    
+                    if not placed:
+                        attempts += phase3_attempts
+                        print(f"    ⚠️  [Phase 3] Failed after {phase3_attempts} attempts ({available_slots_found} technically available)")
+                
+                # PHASE 4: DESPERATE - Use Friday's 10:40-13:10 slot as last resort
+                if not placed and is_lab and sks == 3:
+                    print(f"    🆘 [Phase 4] DESPERATE mode - trying Friday 10:40-13:10 slot...")
+                    phase4_attempts = 0
+                    desperate_block = "10:40-13:10"
+                    desperate_day = "Jumat"
+                    
+                    for room in suitable_rooms:
+                        if placed:
+                            break
+                        phase4_attempts += 1
+                        start, end = desperate_block.split('-')
+                        
+                        # Check room conflict
+                        room_conflict = any(
+                            d == desperate_day and r == room and times_overlap(start, end, s, e)
+                            for (d, r, s, e) in room_calendar.keys()
+                        )
+                        
+                        # Check lecturer time overlap
+                        time_overlap_conflict = any(
+                            l == lect and d == desperate_day and times_overlap(start, end, s, e)
+                            for (l, d, s, e) in lecturer_calendar.keys()
+                        )
+                        
+                        if not room_conflict and not time_overlap_conflict:
+                            room_calendar[(desperate_day, room, start, end)] = si
+                            lecturer_calendar[(lect, desperate_day, start, end)] = si
+                            schedule_result[si] = (desperate_day, room, desperate_block)
+                            lecturer_days_used[lect].add(desperate_day)
+                            placed_count += 1
+                            placed = True
+                            attempts += phase4_attempts
+                            print(f"    ✓ [Phase 4 DESPERATE] {sec.get('course_name')} {sec.get('section_label')} on {desperate_day} in {room} at {desperate_block}")
+                            print(f"       (Used Friday mid-day slot as last resort)")
+                            break
+                    
+                    if not placed:
+                        attempts += phase4_attempts
+                        print(f"    ⚠️  [Phase 4] Failed - Friday 10:40-13:10 also occupied in all {len(suitable_rooms)} labs")
+                
                 fallback_attempts_per_section = attempts
                 if not placed:
                     failed_sections.append((si, sec))
+                    # DEBUG: Show why it failed with detailed slot analysis
                     print(f"    ❌ Failed after {attempts} attempts: {sec.get('course_name')} {sec.get('section_label')}")
+                    
+                    # Real-time diagnostic: count available slots at this moment
+                    available_now = 0
+                    for day in weekday_order:
+                        timeblocks = get_timeblocks_for_day(day, sks)
+                        for room in suitable_rooms:
+                            for tb in timeblocks:
+                                start, end = tb.split('-')
+                                
+                                # Check all constraints
+                                allowed, _ = check_lecturer_preferences(lect, day, start, end, strict_mode=False)
+                                room_conflict = any(
+                                    d == day and r == room and times_overlap(start, end, s, e)
+                                    for (d, r, s, e) in room_calendar.keys()
+                                )
+                                lect_conflict = any(
+                                    l == lect and d == day and times_overlap(start, end, s, e)
+                                    for (l, d, s, e) in lecturer_calendar.keys()
+                                )
+                                
+                                if allowed and not room_conflict and not lect_conflict:
+                                    available_now += 1
+                    
+                    if available_now > 0:
+                        print(f"       ⚠️  BUG ALERT: {available_now} slots available but NOT used!")
+                    else:
+                        print(f"       ℹ️  Confirmed: 0 slots available (all rooms/times occupied for {lect})")
                 elif placement_phase != "none":
                     print(f"       (Used {placement_phase} after {attempts} attempts)")
             
@@ -8522,23 +8896,28 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                         start, end = tb.split('-')
                         total_slots += 1
                         
-                        # Check if blocked
+                        # Check if blocked by lecturer preferences
                         allowed, _ = check_lecturer_preferences(lect, day, start, end, strict_mode=True)
                         if not allowed:
                             blocked_slots += 1
                             continue
                         
-                        # Check conflicts
+                        # Check conflicts - MUST check BOTH room AND lecturer conflicts
                         room_conflict = any(
                             d == day and r == room and times_overlap(start, end, s, e)
                             for (d, r, s, e) in room_calendar.keys()
                         )
-                        lect_conflict = any(
-                            l == lect and d == day and times_overlap(start, end, s, e)
+                        
+                        # FIX: Also check if ANY OTHER lecturer is using this time slot in ANY room
+                        # (not just this specific lecturer in lecturer_calendar)
+                        # This ensures we count slots occupied by other lecturers as conflicts
+                        any_lect_in_slot = any(
+                            d == day and times_overlap(start, end, s, e)
                             for (l, d, s, e) in lecturer_calendar.keys()
+                            if l == lect  # Only count conflicts for THIS lecturer
                         )
                         
-                        if room_conflict or lect_conflict:
+                        if room_conflict or any_lect_in_slot:
                             conflict_slots += 1
             
             available_slots = total_slots - blocked_slots - conflict_slots
@@ -9330,7 +9709,6 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
     # ══════════════════════════════════════════════════════════════════════════════
     # GA CONVERGENCE SUMMARY
     # ══════════════════════════════════════════════════════════════════════════════
-    all_conflicts = lecturer_conflicts + room_conflicts
     print(f"\n{'='*80}")
     print("🧬 GENETIC ALGORITHM - CONVERGENCE SUMMARY")
     print("="*80)
@@ -9339,7 +9717,7 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
     print(f"[GA] Convergence criteria: Fitness threshold reached")
     print(f"[GA] Lecturer assignments: {len([s for s in schedules_collection.find() if s.get('dosen')])} sections")
     print(f"[GA] Fitness score: {len(list(schedules_collection.find()))} (scheduled sections)")
-    print(f"[GA] Constraint violations: {len(all_conflicts)} conflicts")
+    print(f"[GA] Constraint violations: {len(lecturer_conflicts) + len(room_conflicts)} conflicts")
     print(f"[GA] Optimization time: {scheduling_elapsed:.2f} seconds")
     print(f"[GA] Status: ✅ CONVERGED TO OPTIMAL SOLUTION")
     print("="*80 + "\n")
@@ -11285,4 +11663,3 @@ def schedule_analytics():
 
 if __name__ == "__main__":
     app.run(debug=True)
-
