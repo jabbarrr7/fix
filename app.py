@@ -7434,11 +7434,28 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
             if lect not in lecturer_courses:
                 lecturer_courses[lect] = []
             lecturer_courses[lect].append(course_id)
+            
+            # DEBUG: Track AR RAZI course assignments
+            if "RAZI" in lect.upper():
+                print(f"  [DEBUG] Found lecturer '{lect}' selected for {course_name}")
     
     # Calculate fair distribution: each lecturer should get sections from ALL their courses
     # Strategy: PRIORITY 1 section per course first, then distribute remaining proportionally
     # ⚡ NEW CONSTRAINT: Jika dosen mengajar 2+ MK yang SEMUA punya ≥2 sections, WAJIB dapat 2 section per MK
     print("\n📊 Pre-allocation analysis:")
+    
+    # DEBUG: Check if AR RAZI is in lecturer_courses
+    if "AR RAZI, ST.,M.Cs" in lecturer_courses:
+        print(f"  [DEBUG] AR RAZI found in lecturer_courses: {len(lecturer_courses['AR RAZI, ST.,M.Cs'])} courses")
+        for cid in lecturer_courses["AR RAZI, ST.,M.Cs"]:
+            print(f"    - {course_details[cid]['name']}: {course_details[cid]['num_sections']} sections")
+    else:
+        print(f"  [DEBUG] ⚠️ AR RAZI NOT FOUND in lecturer_courses!")
+        print(f"  [DEBUG] Total lecturers in lecturer_courses: {len(lecturer_courses)}")
+        # Print first 5 lecturer names for comparison
+        sample_names = list(lecturer_courses.keys())[:5]
+        print(f"  [DEBUG] Sample names: {sample_names}")
+    
     lecturer_allocations = {}  # lecturer -> {course_id: num_sections}
     
     for lect, course_ids in lecturer_courses.items():
@@ -7462,6 +7479,17 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
         if len(course_ids) >= 2:
             all_courses_have_capacity = all(course_fair_shares[cid] >= 2.0 for cid in course_ids)
             total_sks_needed = sum(course_sks[cid] * 2 for cid in course_ids)
+            
+            # DEBUG: Log detailed check for multi-course lecturers
+            if lect == "AR RAZI, ST.,M.Cs":
+                print(f"  [DEBUG] {lect}:")
+                print(f"    - Teaches {len(course_ids)} courses")
+                for cid in course_ids:
+                    print(f"    - {course_details[cid]['name']}: {course_fair_shares[cid]:.2f} sections per lecturer")
+                print(f"    - All have capacity (≥2.0): {all_courses_have_capacity}")
+                print(f"    - Total SKS needed (2×each): {total_sks_needed} / {max_cap}")
+                print(f"    - Will enforce: {all_courses_have_capacity and total_sks_needed <= max_cap}")
+            
             if all_courses_have_capacity and total_sks_needed <= max_cap:
                 enforce_multi_course_balance = True
                 print(f"  ⚡ {lect}: ENFORCE 2 sections per course (multi-course balance)")
@@ -7644,10 +7672,11 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                 sec['dosen'] = phase1_lect
                 continue
             
-            # Phase 2: Section not assigned in phase 1 - assign to dosen dengan lowest count
-            # ⚡ FAIRNESS: Respect enforcement constraint - don't give more to lecturers exceeding minimum
-            # if there are lecturers still at minimum
-            eligible = []
+            # Phase 2: Section not assigned in phase 1 - assign with FAIRNESS priority
+            # ⚡ FAIRNESS: Prioritize lecturers BELOW minimum first
+            eligible_below_min = []
+            eligible_at_or_above_min = []
+            
             for lect in selected_by:
                 cur_sks = int(lecturer_current_sks.get(lect, 0))
                 max_cap = int(lecturer_max_sks.get(lect, 12) or 12)
@@ -7658,17 +7687,19 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                 if cur_sks + sks_course > max_cap:
                     continue
                 
-                # ⚡ FAIRNESS: If lecturer already MORE than minimum, skip if someone still at minimum
-                if already_assigned > min_required:
-                    # Check apakah ada lecturer lain still at or below minimum
-                    lecturers_at_min = [l for l in selected_by 
-                                       if lecturer_assigned_this_course[l] <= enforce_min_2_sections.get(l, 0)
-                                       and lecturer_current_sks.get(l, 0) + sks_course <= lecturer_max_sks.get(l, 12)]
-                    if lecturers_at_min:
-                        # Ada lecturer lain yang masih perlu section - skip ini
-                        continue
-                
-                eligible.append((already_assigned, cur_sks, lect))
+                # Separate into two groups: BELOW minimum vs AT/ABOVE minimum
+                if already_assigned < min_required:
+                    eligible_below_min.append((already_assigned, cur_sks, lect))
+                else:
+                    eligible_at_or_above_min.append((already_assigned, cur_sks, lect))
+            
+            # ⚡ PRIORITY: Give to those BELOW minimum first
+            if eligible_below_min:
+                eligible = eligible_below_min
+            elif eligible_at_or_above_min:
+                eligible = eligible_at_or_above_min
+            else:
+                eligible = []
             
             if not eligible:
                 # No one dapat ini section - DELETE
