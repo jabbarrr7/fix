@@ -7437,7 +7437,7 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
     
     # Calculate fair distribution: each lecturer should get sections from ALL their courses
     # Strategy: PRIORITY 1 section per course first, then distribute remaining proportionally
-    # ⚡ NEW CONSTRAINT: Jika dosen mengajar 2+ MK yang SEMUA punya ≥2 sections, maka WAJIB dapat 2 section per MK
+    # ⚡ NEW CONSTRAINT: Jika dosen mengajar 2+ MK yang SEMUA punya ≥2 sections, WAJIB dapat 2 section per MK
     print("\n📊 Pre-allocation analysis:")
     lecturer_allocations = {}  # lecturer -> {course_id: num_sections}
     
@@ -7455,8 +7455,8 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
             course_fair_shares[cid] = fair_share
             course_sks[cid] = cd['sks']
         
-        # ⚡ NEW CONSTRAINT CHECK: Multi-course lecturers with sufficient sections
-        # If dosen teaches 2+ courses AND all courses have ≥2 sections available per dosen,
+        # ⚡ NEW CONSTRAINT CHECK: Multi-course lecturers dengan cukup section
+        # Jika dosen mengajar 2+ courses DAN semua punya ≥2 sections available per dosen,
         # ENFORCE minimum 2 sections per course
         enforce_multi_course_balance = False
         if len(course_ids) >= 2:
@@ -7467,8 +7467,6 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                 print(f"  ⚡ {lect}: ENFORCE 2 sections per course (multi-course balance)")
         
         # ALLOCATION: 2-phase water-filling
-        # 1) Give 1 section per course (if capacity allows)
-        # 2) Round-robin up to ideal = round(fair_share) while capacity remains
         allocations = {cid: 0 for cid in course_ids}
         total_allocated_sks = 0
         courses_sorted_by_fair_share = sorted(course_ids, key=lambda c: course_fair_shares[c], reverse=True)
@@ -7482,7 +7480,7 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                     allocations[cid] = 2  # MINIMUM 2 sections
                     total_allocated_sks += sks * 2
                 else:
-                    # Fallback to 1 if can't fit 2
+                    # Fallback: try 1 if can't fit 2
                     if total_allocated_sks + sks <= max_cap:
                         allocations[cid] = 1
                         total_allocated_sks += sks
@@ -7498,10 +7496,10 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
         
         remaining_sks = max_cap - total_allocated_sks
         if remaining_sks > 0 and not enforce_multi_course_balance:
-            # Phase 2: round-robin toward ideal allocations (only if not enforcing balance)
+            # Phase 2: round-robin toward ideal allocations (only if NOT enforcing balance)
             ideal_allocs = {cid: max(1, round(course_fair_shares[cid])) for cid in course_ids}
             allocation_attempts = 0
-            max_attempts = len(course_ids) * 10  # Prevent infinite loops
+            max_attempts = len(course_ids) * 10
             
             while remaining_sks > 0 and allocation_attempts < max_attempts:
                 allocation_attempts += 1
@@ -7589,18 +7587,19 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
             else:
                 enforce_min_2_sections[lect] = 0
         
-        # STRICT ASSIGNMENT: Setiap dosen HARUS dapat MINIMUM sesuai target allocation
-        # Phase 1: Assign MINIMUM allocation per dosen (baseline)
-        print(f"        [PHASE 1] Baseline allocation per dosen:")
+        # ═══════════════════════════════════════════════════════════════════
+        # PHASE 1: Baseline assignment ensuring each lecturer reaches MINIMUM
+        # ═══════════════════════════════════════════════════════════════════
+        print(f"        [PHASE 1] Baseline assignment per dosen:")
         phase1_assigned = {lect: 0 for lect in selected_by}
         phase1_sections = []
         
         for sec in course_sections:
-            # Find dosen yang BELUM mencapai MINIMUM allocation
+            # Find lecturers BELUM mencapai MINIMUM allocation
             dosens_below_min = [l for l in selected_by if phase1_assigned[l] < enforce_min_2_sections[l]]
             
             if dosens_below_min:
-                # Pick dosen with lowest current SKS (for fair load balance)
+                # Pick dosen dengan lowest current SKS (fair load balance)
                 dosens_below_min.sort(key=lambda l: lecturer_current_sks.get(l, 0))
                 chosen = dosens_below_min[0]
                 
@@ -7616,14 +7615,16 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                     progress = f"{phase1_assigned[chosen]}/{min_target}" if min_target > 0 else f"{phase1_assigned[chosen]}"
                     print(f"          ✓ {chosen}: {sec.get('section_label', 'N/A')} (baseline {progress})")
                 else:
-                    # Cannot assign to this dosen - will handle in phase 2
-                    print(f"          ⚠️ Cannot baseline assign to {chosen} (SKS limit)")
-                    phase1_sections.append((sec, None))  # Mark as unassigned
+                    # Cannot assign - will handle in phase 2
+                    print(f"          ⚠️ Cannot baseline {chosen} (SKS limit)")
+                    phase1_sections.append((sec, None))
             else:
-                # All dosens already have MINIMUM allocation
-                phase1_sections.append((sec, None))  # Mark for phase 2
+                # All dosens already at or above minimum
+                phase1_sections.append((sec, None))
         
-        # Phase 2: Distribute remaining sections fairly
+        # ═══════════════════════════════════════════════════════════════════
+        # PHASE 2: Distribute remaining sections with FAIRNESS constraint
+        # ═══════════════════════════════════════════════════════════════════
         print(f"        [PHASE 2] Distribute remaining sections:")
         sections_to_delete = []
         
@@ -7643,30 +7644,45 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                 sec['dosen'] = phase1_lect
                 continue
             
-            # Phase 2: Section not assigned in phase 1 - assign to dosen with lowest count in this course
+            # Phase 2: Section not assigned in phase 1 - assign to dosen dengan lowest count
+            # ⚡ FAIRNESS: Respect enforcement constraint - don't give more to lecturers exceeding minimum
+            # if there are lecturers still at minimum
             eligible = []
             for lect in selected_by:
                 cur_sks = int(lecturer_current_sks.get(lect, 0))
                 max_cap = int(lecturer_max_sks.get(lect, 12) or 12)
                 already_assigned = lecturer_assigned_this_course[lect]
+                min_required = enforce_min_2_sections.get(lect, 0)
                 
-                # Phase 2: No quota limit, just SKS constraint
-                if cur_sks + sks_course <= max_cap:
-                    eligible.append((already_assigned, cur_sks, lect))
+                # Check SKS constraint
+                if cur_sks + sks_course > max_cap:
+                    continue
+                
+                # ⚡ FAIRNESS: If lecturer already MORE than minimum, skip if someone still at minimum
+                if already_assigned > min_required:
+                    # Check apakah ada lecturer lain still at or below minimum
+                    lecturers_at_min = [l for l in selected_by 
+                                       if lecturer_assigned_this_course[l] <= enforce_min_2_sections.get(l, 0)
+                                       and lecturer_current_sks.get(l, 0) + sks_course <= lecturer_max_sks.get(l, 12)]
+                    if lecturers_at_min:
+                        # Ada lecturer lain yang masih perlu section - skip ini
+                        continue
+                
+                eligible.append((already_assigned, cur_sks, lect))
             
             if not eligible:
-                # No one can take this section - delete it
+                # No one dapat ini section - DELETE
                 sections_to_delete.append(sec)
                 deleted_sections.append({
                     'course_name': course_name,
                     'section_label': sec.get('section_label', 'N/A'),
                     'sks': sks_course,
-                    'reason': 'All lecturers at capacity'
+                    'reason': 'All lecturers at capacity or enforcement constraint'
                 })
                 print(f"          ❌ DELETE: {sec.get('section_label', 'N/A')} - no capacity")
                 continue
             
-            # Assign to dosen with lowest count in this course
+            # Assign to dosen dengan lowest count in this course
             eligible.sort(key=lambda t: (t[0], t[1]))
             chosen = eligible[0][2]
             
@@ -7683,7 +7699,6 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
             sec['dosen'] = chosen
             print(f"          ✓ {chosen}: {sec.get('section_label', 'N/A')} (phase 2: {lecturer_assigned_this_course[chosen]} total)")
             assigned_count += 1
-
         
         # Execute deletion for this course
         if sections_to_delete:
@@ -7703,157 +7718,6 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
             print(f"   ... and {len(deleted_sections) - 10} more")
     
     print(f"\n[OK] Total {assigned_count} sections assigned to lecturers\n")
-    
-    # RELOAD sections dari DB untuk ensure data terbaru
-    sections = list(sections_collection.find())
-    if not sections:
-        print("WARNING: No sections found after assignment!")
-        print("="*80)
-        return  # Exit if no sections
-    
-    print(f"[DEBUG] Loaded {len(sections)} sections from database for POST-REPAIR")
-    
-    # ════════════════════════════════════════════════════════════════════════════
-    # POST-ASSIGNMENT REPAIR: REBALANCE DISTRIBUTION PER COURSE
-    # ════════════════════════════════════════════════════════════════════════════
-    print("\n" + "="*80)
-    print("POST-REPAIR: REBALANCING SECTION DISTRIBUTION PER COURSE")
-    print("="*80)
-    
-    # Recalculate course_lecturer_sections dari sections terbaru
-    course_lecturer_sections = {}  # {course_id: {lecturer: [sections]}}
-    for sec in sections:
-        course_id = sec.get('course_id')
-        lect = sec.get('lecturer') or sec.get('dosen')
-        if course_id and lect:
-            if course_id not in course_lecturer_sections:
-                course_lecturer_sections[course_id] = {}
-            if lect not in course_lecturer_sections[course_id]:
-                course_lecturer_sections[course_id][lect] = []
-            course_lecturer_sections[course_id][lect].append(sec)
-    
-    print(f"[DEBUG] Found {len(course_lecturer_sections)} courses with assigned sections")
-    
-    # Recalculate lecturer_current_sks untuk accuracy
-    lecturer_current_sks = {}
-    for sec in sections:
-        lect = sec.get('lecturer') or sec.get('dosen')
-        sks = int(sec.get('sks', 3) or 3)
-        if lect:
-            lecturer_current_sks[lect] = lecturer_current_sks.get(lect, 0) + sks
-    
-    print(f"[DEBUG] Lecturer SKS tracking: {dict(lecturer_current_sks)}\n")
-    
-    # Identify and fix unbalanced courses
-    rebalance_count = 0
-    for course_id, cd in course_details.items():
-        course_name = cd['name']
-        selected_by = cd['selected_by']
-        
-        if len(selected_by) <= 1:
-            continue  # Skip single-lecturer courses
-        
-        if course_id not in course_lecturer_sections:
-            print(f"[SKIP] {course_name}: No sections in database")
-            continue
-        
-        lect_sections_dict = course_lecturer_sections[course_id]  # {lecturer: [sections]}
-        
-        # Count sections per lecturer
-        lect_counts = {lect: len(secs) for lect, secs in lect_sections_dict.items()}
-        counts_list = list(lect_counts.values())
-        
-        if not counts_list or max(counts_list) == 0:
-            continue
-        
-        max_count = max(counts_list)
-        min_count = min(counts_list)
-        deviation = max_count - min_count
-        
-        # Log current state
-        print(f"\n[CHECK] {course_name} ({len(selected_by)} lecturers):")
-        print(f"  Selected by: {selected_by}")
-        print(f"  Current distribution: {lect_counts}")
-        print(f"  Deviation: {max_count} - {min_count} = {deviation}")
-        
-        # If deviation > 1, try to rebalance
-        if deviation > 1:
-            print(f"\n[REBALANCE] {course_name}: Unbalanced distribution detected")
-            print(f"  Before: {lect_counts}")
-            # Get all sections for this course using fresh data
-            sections_by_lect = lect_sections_dict.copy()  # Use already-grouped data
-            
-            # Try to transfer sections from max to min
-            attempts = 0
-            max_attempts = 20
-            
-            while deviation > 1 and attempts < max_attempts:
-                attempts += 1
-                
-                # Find lecturer with most sections (donor) and least (receiver)
-                lecturers_with_counts = [(l, len(secs)) for l, secs in sections_by_lect.items()]
-                lecturers_with_counts.sort(key=lambda x: x[1], reverse=True)
-                
-                donor = lecturers_with_counts[0][0]
-                donor_count = lecturers_with_counts[0][1]
-                receiver = lecturers_with_counts[-1][0]
-                receiver_count = lecturers_with_counts[-1][1]
-                
-                if donor_count - receiver_count <= 1:
-                    break
-                
-                # Try to move a section from donor to receiver
-                sec_to_move = sections_by_lect[donor][-1]  # Move last section
-                sks = int(sec_to_move.get('sks', 3) or 3)
-                section_label = sec_to_move.get('section_label', 'Unknown')
-                
-                # Check if receiver can accept (SKS constraint)
-                receiver_total_sks = int(lecturer_current_sks.get(receiver, 0))
-                max_cap = int(lecturer_max_sks.get(receiver, 12) or 12)
-                
-                print(f"    Attempt {attempts}: {donor} ({donor_count} sec) → {receiver} ({receiver_count} sec)")
-                print(f"      Moving {section_label}: {receiver} SKS {receiver_total_sks}/{max_cap}")
-                
-                if receiver_total_sks + sks <= max_cap:
-                    # Transfer
-                    sections_collection.update_one(
-                        {"_id": sec_to_move["_id"]},
-                        {"$set": {"lecturer": receiver, "dosen": receiver}}
-                    )
-                    sec_to_move['lecturer'] = receiver
-                    sec_to_move['dosen'] = receiver
-                    
-                    # Update tracking
-                    sections_by_lect[donor].remove(sec_to_move)
-                    sections_by_lect[receiver].append(sec_to_move)
-                    lecturer_current_sks[donor] -= sks
-                    lecturer_current_sks[receiver] += sks
-                    
-                    rebalance_count += 1
-                    print(f"      ✓ SUCCESS: Transferred {section_label} to {receiver}")
-                    
-                    # Recalculate deviation
-                    new_counts = {l: len(secs) for l, secs in sections_by_lect.items()}
-                    counts_list = list(new_counts.values())
-                    deviation = max(counts_list) - min(counts_list) if counts_list else 0
-                else:
-                    # Cannot transfer due to SKS constraint - break
-                    print(f"      ❌ BLOCKED: {receiver} already at {receiver_total_sks}/{max_cap} SKS, adding {sks} SKS would exceed")
-                    break
-            
-            # Log final state
-            final_counts = {l: len(secs) for l, secs in sections_by_lect.items()}
-            final_deviation = max(final_counts.values()) - min(final_counts.values()) if final_counts.values() else 0
-            print(f"  Final: {final_counts} (deviation: {final_deviation})")
-        else:
-            print(f"  ✓ BALANCED (deviation: {deviation})")
-    
-    if rebalance_count > 0:
-        print(f"\n✅ REBALANCE COMPLETE: {rebalance_count} section transfers")
-    else:
-        print(f"\n✅ All courses already balanced")
-    
-    print("="*80 + "\n")
     
     # Reload sections dengan assignment terbaru
     sections = list(sections_collection.find())
