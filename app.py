@@ -7544,22 +7544,6 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
     lecturer_current_sks = {}
     assigned_count = 0
     deleted_sections = []
-    
-    # ⚡ GLOBAL CROSS-COURSE TRACKING for multi-course balance enforcement
-    # (lecturer, course_id) -> min_sections_required
-    global_min_requirements = {}
-    # (lecturer, course_id) -> sections_assigned_so_far
-    global_assignments = {}
-    # lecturer -> list of (course_id, min_required) for their courses
-    lecturer_course_minimums = {lect: [] for lect in lecturer_courses.keys()}
-    
-    # Build global minimums from lecturer_allocations
-    for lect, course_allocs in lecturer_allocations.items():
-        for cid, num_sections in course_allocs.items():
-            min_req = 2 if num_sections >= 2 else num_sections
-            global_min_requirements[(lect, cid)] = min_req
-            global_assignments[(lect, cid)] = 0
-            lecturer_course_minimums[lect].append((cid, min_req))
     for course_id, course_sections in sections_by_course.items():
         if course_id not in course_details:
             continue
@@ -7650,9 +7634,6 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                 lecturer_assigned_this_course[phase1_lect] += 1
                 lecturer_current_sks[phase1_lect] = lecturer_current_sks.get(phase1_lect, 0) + sks
                 
-                # Update global tracking
-                global_assignments[(phase1_lect, course_id)] = global_assignments.get((phase1_lect, course_id), 0) + 1
-                
                 # Persist
                 sections_collection.update_one(
                     {"_id": sec["_id"]},
@@ -7668,31 +7649,10 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                 cur_sks = int(lecturer_current_sks.get(lect, 0))
                 max_cap = int(lecturer_max_sks.get(lect, 12) or 12)
                 already_assigned = lecturer_assigned_this_course[lect]
-                min_required = enforce_min_2_sections.get(lect, 0)
                 
                 # Phase 2: No quota limit, just SKS constraint
-                if cur_sks + sks_course > max_cap:
-                    continue
-                
-                # ⚡ MULTI-COURSE FAIRNESS CHECK
-                is_multi_course_blocked = False
-                if lect in lecturer_course_minimums and len(lecturer_course_minimums[lect]) >= 2:
-                    has_course_below_min = False
-                    for other_course_id, other_min_req in lecturer_course_minimums[lect]:
-                        if other_course_id != course_id:
-                            other_assigned = global_assignments.get((lect, other_course_id), 0)
-                            if other_assigned < other_min_req:
-                                has_course_below_min = True
-                                break
-                    
-                    # Block if already meets minimum for THIS course but below min in another
-                    if min_required > 0 and already_assigned >= min_required and has_course_below_min:
-                        is_multi_course_blocked = True
-                
-                if is_multi_course_blocked:
-                    continue
-                
-                eligible.append((already_assigned, cur_sks, lect))
+                if cur_sks + sks_course <= max_cap:
+                    eligible.append((already_assigned, cur_sks, lect))
             
             if not eligible:
                 # No one can take this section - delete it
@@ -7713,9 +7673,6 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
             sks = int(sec.get('sks', 3) or 3)
             lecturer_assigned_this_course[chosen] += 1
             lecturer_current_sks[chosen] = lecturer_current_sks.get(chosen, 0) + sks
-            
-            # Update global tracking
-            global_assignments[(chosen, course_id)] = global_assignments.get((chosen, course_id), 0) + 1
             
             # Persist
             sections_collection.update_one(
