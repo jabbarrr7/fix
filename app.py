@@ -7611,6 +7611,8 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                 if cur_sks + sks_course <= max_cap:
                     # Assign
                     phase1_assigned[chosen] += 1
+                    # Track SKS immediately to prevent over-allocation in phase 1
+                    lecturer_current_sks[chosen] = cur_sks + sks_course
                     phase1_sections.append((sec, chosen))
                     min_target = enforce_min_2_sections[chosen]
                     progress = f"{phase1_assigned[chosen]}/{min_target}" if min_target > 0 else f"{phase1_assigned[chosen]}"
@@ -7632,7 +7634,7 @@ def schedule_sections_with_ortools(max_seconds=60, semester_type='semua'):
                 # Already assigned in phase 1
                 sks = int(sec.get('sks', 3) or 3)
                 lecturer_assigned_this_course[phase1_lect] += 1
-                lecturer_current_sks[phase1_lect] = lecturer_current_sks.get(phase1_lect, 0) + sks
+                # SKS already tracked during phase 1 assignment
                 
                 # Persist
                 sections_collection.update_one(
